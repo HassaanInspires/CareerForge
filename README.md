@@ -1,24 +1,4 @@
-# CareerForge V3.0 — The AI Resume Authenticity Engine
-
-CareerForge is an intelligent resume assistant that optimizes your resume for any job using AI.
-
-## ✨ Features (MVP - Working Now)
-- ✅ PDF resume upload
-- ✅ Job description input
-- ✅ Multi-provider AI (Claude, GPT-4, Gemini, Groq, Mistral)
-- ✅ Resume optimization
-- ✅ Match score (0-100)
-- ✅ Missing skills analysis
-- ✅ Cover letter generation
-- ✅ Copy-to-clipboard
-- ✅ Dark mode UI
-- ✅ Responsive design
-
-## 🔜 Coming Next (Phase 2)
-- Smart questions
-- Professional memory
-- Advanced settings
-- [etc]
+# CareerForge V4.0 — The AI Resume Authenticity Engine
 
 CareerForge is an enterprise-grade, privacy-first career diagnostic platform designed to bridge the gap between static human resumes and complex modern Applicant Tracking Systems (ATS). 
 
@@ -26,19 +6,26 @@ Instead of generating generic, buzzword-heavy AI text that hiring managers easil
 
 ---
 
-## 🚀 Key Features
+## ✨ Features (V4.0 - Working Now)
 
-### 1. Persistent Candidate Memory
-Features a client-managed Candidate Graph (`lib/memory.ts`) that extracts and saves core skills, metrics, goals, and gaps. The system preserves your profile data dynamically without storing sensitive data on remote backend databases.
+### 1. Master CV Persistent Hub (`/profile`)
+Upload your resume once. The system extracts your baseline history, saves it in local browser storage, and uses it for all future applications without forcing you to re-upload.
 
-### 2. Infinite Interview Loop
-Powered by a conversational coaching engine (`/api/chat`). The AI reviews your uploaded CV and the target Job Description to highlight critical gaps. It interviews you dynamically, asking targeted questions to extract missing metrics, ending only when your profile's data sufficiency score reaches **85%+**.
+### 2. Candidate Memory Graph Visualizer
+See your inferred Career Level (e.g. Entry, Senior, Executive), Core Skills, and Verifiable Metrics directly on a high-trust, visual memory dashboard. Talk directly to your personal Memory Manager via chat to dynamically edit or update your data.
 
-### 3. Professional, High-Trust UI
-Ditched glowing blobs and glassmorphic toy aesthetics for a clean, minimalist "Vercel-like" design system. Built with stark typography, a zinc/slate monochrome color palette, subtle patterns, and professional micro-interactions.
+### 3. Divergent Assessment Paths
+*   **Path A (Job Target Optimization)**: Paste a job description. The AI compares it with your memory graph, asks dynamic follow-up questions to fill in missing details, and outputs an optimized resume.
+*   **Path B (Career Level Assessor)**: The AI assesses your memory graph against current market demands, location, and salary goals to suggest suitable job titles, salary estimates, and flag roles you aren't ready for yet.
 
-### 4. Chain-of-Thought (CoT) & Strict Guardrails
-Generates resume adjustments with a hidden `<thought>` process, drastically reducing hallucinations. Enforces safety guardrails: the engine rejects off-topic chats, forbids metric inventing, and automatically filters out generic corporate buzzwords.
+### 4. Advanced Multi-Dimensional Scoring
+Provides an explainability layer for your score, breaking evaluations down into:
+*   **ATS Parsability**: Formatting and structure readiness.
+*   **Impact Density**: Quantitative metrics and output indicators.
+*   **Keyword Alignment**: Contextual semantic keyword matches.
+
+### 5. Interactive Post-Generation Refinement Chat
+Allows real-time modification of optimized outputs via a conversation refinement box. Ask the AI to *"Make the summary shorter"* or *"Rewrite the project bullet points to be more technical,"* and it will apply adjustments instantly.
 
 ---
 
@@ -78,15 +65,13 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ```mermaid
 graph TD
-  A[Original Resume + Job Description] --> B[Step 1 & 2: Builder Uploads]
-  B --> C[Step 3: Infinite Interview Loop]
-  C -->|Ask Questions| D[User Input]
-  D -->|Update Memory| E[Memory Manager lib/memory.ts]
-  E -->|Calculate Sufficiency| F{Score >= 85?}
-  F -->|No| C
-  F -->|Yes| G[Step 4: Generation Settings]
-  G -->|Trigger Optimization| H[Optimize API /api/optimize]
-  H -->|Chain-of-Thought AI| I[Final Optimized Resume + Gap Analysis]
+  A[Master CV Uploaded once in Profile Hub] --> B[Baseline Memory Extraction /api/onboard]
+  B --> C[Candidate Memory Dashboard]
+  C -->|Path A: Target Job| D[Job Optimizer: Interview Loop]
+  C -->|Path B: Career Level| E[Career Assessment Report]
+  D --> F[Advanced Scoring Breakdown]
+  F --> G[Interactive Refinement Chat /api/refine]
+  G --> H[Final Optimized Resume Output]
 ```
 
 For a detailed chronicle of modifications and design decisions, see [PROJECT_PROGRESS.md](./PROJECT_PROGRESS.md).

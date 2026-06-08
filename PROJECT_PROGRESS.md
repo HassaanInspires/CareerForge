@@ -1,22 +1,10 @@
-# CareerForge Upgrades & Progress Chronicle
-
-This document chronicles the design and architectural progression of CareerForge from its initial prototype state to the Enterprise V3.0 "Authenticity Engine."
-
----
-
-markdown# CareerForge - Project Progress & Development Journey
-
-
-
+# CareerForge - Project Progress & Development Journey
 
 ## 1. Initial State Analysis (The Starting Point - June 8, 2026)
 Started with:
 - Empty folder
 - 5 specification documents (SPEC.md, AGENT.md, ARCHITECTURE.md, SKILL.md, DESIGN_SYSTEM.md)
 - Plan: Use Gemini CLI to generate code
-
-
-When the project was first reviewed, CareerForge was a basic AI resume helper featuring:
 
 ### Challenges Faced:
 - Gemini CLI generated incomplete/broken code
@@ -29,10 +17,6 @@ When the project was first reviewed, CareerForge was a basic AI resume helper fe
 *   **No Chat Memory**: A rigid questionnaire step that asked 3-5 pre-determined questions sequentially without adapting to or preserving user response history.
 
 ---
-
-
-
-
 
 ## 2. Solution: Switched to Antigravity and Iterative Development & Upgrades (Phases)
 
@@ -55,6 +39,14 @@ When the project was first reviewed, CareerForge was a basic AI resume helper fe
     *   **Continuous Chat Engine**: Refactored Step Three to host an interactive conversation loop (`/api/chat`), acting like a professional executive coach to extract quantitative business impact.
     *   **Strict Security & Guardrails**: Enforced Chain-of-Thought reasoning. Added system instructions to reject non-career related queries, scrub AI fluff words, and block metrics hallucinations.
 
+### Phase 3: The Career Command Center (V4.0)
+*   **Objective**: Solve the inconvenience of repeating resume uploads, introduce career level path tracking, provide professional multi-dimensional grading, and enable post-generation interactive editing.
+*   **Implementation**:
+    *   **Persistent Profile Hub (`/profile`)**: Implemented a dashboard where users upload their CV once. It initializes their permanent memory and allows updating it via a direct onboarding chat.
+    *   **Divergent Paths**: Split the builder flow into Path A (Specific Job target optimization) and Path B (Career level & market fit assessment).
+    *   **Advanced Semantic Scoring**: Overhauled the simple 0-100 metric into multi-dimensional cards evaluating ATS parsability, impact density, and keyword alignment.
+    *   **Post-Generation Refinement Chat (`/api/refine`)**: Added an AI-driven edit loop beneath the final resume draft, letting users rewrite sections dynamically through conversational prompt refinements.
+
 ---
 
 ## 3. Code Modifications & Repository Health
@@ -62,14 +54,19 @@ When the project was first reviewed, CareerForge was a basic AI resume helper fe
 ### Added Files
 *   [`lib/memory.ts`](file:///careerforge/lib/memory.ts): Core memory schemas, default states, and the RAG-inspired `updateMemory` LLM loop.
 *   [`app/api/chat/route.ts`](file:///careerforge/app/api/chat/route.ts): Continuous dialogue endpoint that parses resumes, processes user replies, updates memory graphs, and tracks data sufficiency.
+*   [`app/api/onboard/route.ts`](file:///careerforge/app/api/onboard/route.ts): Initial memory-onboarding API endpoint.
+*   [`app/api/refine/route.ts`](file:///careerforge/app/api/refine/route.ts): Chat refinement API for real-time post-generation edits.
+*   [`app/profile/page.tsx`](file:///careerforge/app/profile/page.tsx): Central profile memory visualizer and onboarding controller.
 
 ### Modified Files
 *   [`app/globals.css`](file:///careerforge/app/globals.css): Stripped neon glassmorphism and bouncy blobs. Integrated a monochrome zinc/slate aesthetic with clean grid-patterns.
-*   [`app/page.tsx`](file:///careerforge/app/page.tsx): Rewrote the Hero and Feature showcase to align with the enterprise design.
-*   [`app/builder/page.tsx`](file:///careerforge/app/builder/page.tsx): Updated state machines to swap `smartQuestions` payload arrays for the structured `CandidateMemory` object.
+*   [`app/page.tsx`](file:///careerforge/app/page.tsx): Rewrote the Hero, Feature showcase, and added navigation header links.
+*   [`app/builder/page.tsx`](file:///careerforge/app/builder/page.tsx): Updated state machine to handle path selection and support the new `/api/optimize` payload structures.
+*   [`components/StepOne.tsx`](file:///careerforge/components/StepOne.tsx): Overhauled to support Path A/B selection and check for Master CV presence.
 *   [`components/StepThree.tsx`](file:///careerforge/components/StepThree.tsx): Rewrote the static 3-5 question view into an active chat transcript box complete with a real-time "Data Sufficiency" progress meter.
-*   [`lib/utils.ts`](file:///careerforge/lib/utils.ts): Updated `generatePrompt` to require `memory` structures and mandate Chain-of-Thought (`<thought>` block) output generation.
-*   [`lib/types.ts`](file:///careerforge/lib/types.ts): Modified request schemas (`OptimizeRequest`) to integrate the custom `CandidateMemory` type.
+*   [`components/ResultsPanel.tsx`](file:///careerforge/components/ResultsPanel.tsx): Rebuilt to show Advanced overall scoring graphs and house the "Refine with AI" chat interface.
+*   [`lib/utils.ts`](file:///careerforge/lib/utils.ts): Updated `generatePrompt` to output `advancedScore` and support Career Assessment instructions.
+*   [`lib/types.ts`](file:///careerforge/lib/types.ts): Modified request schemas (`OptimizeRequest`) to integrate `advancedScore` metrics.
 
 ---
 
@@ -87,15 +84,20 @@ When the project was first reviewed, CareerForge was a basic AI resume helper fe
 *   **Challenge**: Users often write vague inputs ("I worked in marketing"), which leads to subpar output.
 *   **Solution**: Programmed strict LLM system prompts that reject generic responses and push back with professional skepticism (e.g. asking "What percentage did click-through rates improve?").
 
+### 4. Browser File Overlaps
+*   **Challenge**: Standard CSS absolute overlapping on file input components can intercept browser focus differently, blocking file upload actions.
+*   **Solution**: Hidden file inputs linked to high-trust `<button>` triggers programmatically: `onClick={() => document.getElementById('profile-cv-upload')?.click()}`.
 
-## 5. Current State (MVP Complete)
+---
+
+## 5. Current State (V4.0 Complete)
 ✅ PDF resume upload & text extraction
-✅ Job description input
+✅ Master CV Persistent Hub & Local memory graph visualizer
+✅ Continuous dynamic career onboarding interview
+✅ Split Path Assessment (Job Targeting vs. Career Level assessment)
 ✅ Multi-provider AI support (Anthropic, OpenAI, Gemini, Groq, Mistral)
-✅ Resume optimization
-✅ Match score (0-100)
-✅ Missing skills analysis
-✅ Cover letter generation
+✅ Advanced Semantic Scoring (ATS Parsability, Impact Density, Keyword Match)
+✅ Interactive Post-Generation AI Refinement Chat
 ✅ Copy-to-clipboard
-✅ Dark mode UI
+✅ Modern Dark Mode Vercel Grid UI
 ✅ Responsive design

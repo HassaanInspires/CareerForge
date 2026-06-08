@@ -1,29 +1,38 @@
 'use client';
 
 import React, { useState } from 'react';
-import { OptimizeResponse } from '@/lib/types';
+import { OptimizeResponse, Provider } from '@/lib/types';
 
 interface ResultsPanelProps {
   result: OptimizeResponse;
   onReset: () => void;
 }
 
-export default function ResultsPanel({ result, onReset }: ResultsPanelProps) {
+export default function ResultsPanel({ result: initialResult, onReset }: ResultsPanelProps) {
+  const [result, setResult] = useState<OptimizeResponse>(initialResult);
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
+  const [chatInput, setChatInput] = useState('');
+  const [isRefining, setIsRefining] = useState(false);
+  const [refineError, setRefineError] = useState('');
 
   // Safely handle potentially missing data from LLM response
   const breakdown = result?.breakdown || {};
   const missingSkills = result?.missingSkills || [];
   const suggestions = result?.suggestions || [];
-  const smartQuestions = result?.smartQuestions || {};
   const optimizedResume = result?.optimizedResume || '';
   const matchScore = result?.matchScore ?? 0;
   
-  // V2.0 SkilledScore-like features
+  // V4.0 Advanced Score
   const careerRoadmap = result?.careerRoadmap || [];
   const gapAnalysis = result?.gapAnalysis || [];
   const marketEvaluation = result?.marketEvaluation || '';
-  const precisionScore = result?.precisionScore || { atsCompatibility: 0, humanReadability: 0 };
+  const advancedScore = result?.advancedScore || {
+    overall: matchScore,
+    atsParsability: 0,
+    impactDensity: 0,
+    keywordAlignment: 0,
+    explanation: 'Score processing...'
+  };
 
   const handleCopy = (text: string, section: string) => {
     if (!text) return;
@@ -46,36 +55,86 @@ export default function ResultsPanel({ result, onReset }: ResultsPanelProps) {
     }
   };
 
+  const handleRefine = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim() || isRefining) return;
+    
+    setIsRefining(true);
+    setRefineError('');
+    const userMsg = chatInput;
+    setChatInput('');
+
+    try {
+      const provider = (localStorage.getItem('cf_provider') as Provider) || 'anthropic';
+      const apiKey = localStorage.getItem(`cf_key_${provider}`) || '';
+      const model = localStorage.getItem(`cf_model_${provider}`) || '';
+
+      const res = await fetch('/api/refine', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentResume: result.optimizedResume,
+          userInstruction: userMsg,
+          provider,
+          model,
+          userApiKey: apiKey
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      // Update the result with the newly refined resume
+      setResult(prev => ({
+        ...prev,
+        optimizedResume: data.refinedResume
+      }));
+    } catch (err: any) {
+      setRefineError(err.message);
+    } finally {
+      setIsRefining(false);
+    }
+  };
+
   return (
     <div className="space-y-8 animate-fade-in">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Match Score Card */}
         <div className="glass-card flex flex-col items-center justify-center p-6 text-center">
-          <h3 className="text-[var(--color-text-secondary)] text-sm font-medium mb-6">Overall Match Score</h3>
-          <div className={`match-score-gauge ${getScoreColorClass(matchScore)}`}>
+          <h3 className="text-[var(--color-text-secondary)] text-sm font-medium mb-6">Advanced Overall Score</h3>
+          <div className={`match-score-gauge ${getScoreColorClass(advancedScore.overall)}`}>
             <svg width="120" height="120" viewBox="0 0 120 120">
               <circle cx="60" cy="60" r="40" />
-              <circle cx="60" cy="60" r="40" style={{ strokeDashoffset: 251.2 - (251.2 * matchScore) / 100 }} />
+              <circle cx="60" cy="60" r="40" style={{ strokeDashoffset: 251.2 - (251.2 * advancedScore.overall) / 100 }} />
             </svg>
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-3xl font-heading font-bold text-[var(--color-text-primary)]">{matchScore}%</span>
+              <span className="text-3xl font-heading font-bold text-[var(--color-text-primary)]">{advancedScore.overall}%</span>
             </div>
           </div>
-          <div className="mt-6 w-full flex justify-between text-xs font-medium px-4">
+          <div className="mt-6 w-full flex justify-between text-xs font-medium px-2 gap-2">
             <div className="flex flex-col items-center">
-              <span className="text-[var(--color-accent-blue)]">{precisionScore.atsCompatibility}%</span>
-              <span className="text-[var(--color-text-secondary)] mt-1">ATS Ready</span>
+              <span className="text-[var(--color-accent-blue)]">{advancedScore.atsParsability}%</span>
+              <span className="text-[var(--color-text-secondary)] mt-1 text-center">ATS Ready</span>
             </div>
             <div className="flex flex-col items-center">
-              <span className="text-[var(--color-accent-purple)]">{precisionScore.humanReadability}%</span>
-              <span className="text-[var(--color-text-secondary)] mt-1">Readability</span>
+              <span className="text-[var(--color-accent-purple)]">{advancedScore.impactDensity}%</span>
+              <span className="text-[var(--color-text-secondary)] mt-1 text-center">Impact</span>
+            </div>
+            <div className="flex flex-col items-center">
+              <span className="text-[var(--color-success)]">{advancedScore.keywordAlignment}%</span>
+              <span className="text-[var(--color-text-secondary)] mt-1 text-center">Keywords</span>
             </div>
           </div>
         </div>
 
         {/* Breakdown Card */}
         <div className="md:col-span-2 glass-card p-6">
-          <h3 className="text-[var(--color-text-secondary)] text-sm font-medium mb-4">Breakdown</h3>
+          <h3 className="text-[var(--color-text-secondary)] text-sm font-medium mb-4">Score Explanation</h3>
+          <p className="text-sm text-white mb-6 p-4 bg-[var(--color-bg-tertiary)] rounded border border-[var(--color-border-medium)]">
+            {advancedScore.explanation}
+          </p>
+
+          <h3 className="text-[var(--color-text-secondary)] text-sm font-medium mb-4">Core Dimensions</h3>
           <div className="grid grid-cols-2 gap-4">
             {Object.entries(breakdown).map(([key, value]) => (
               <div key={key}>
@@ -88,9 +147,6 @@ export default function ResultsPanel({ result, onReset }: ResultsPanelProps) {
                 </div>
               </div>
             ))}
-            {Object.keys(breakdown).length === 0 && (
-              <p className="text-sm text-[var(--color-text-disabled)] italic col-span-2">No breakdown data provided by AI.</p>
-            )}
           </div>
           
           {marketEvaluation && (
@@ -147,25 +203,31 @@ export default function ResultsPanel({ result, onReset }: ResultsPanelProps) {
         </div>
       </div>
 
-      {/* Career Roadmap */}
-      <div className="glass-card p-6">
-        <h3 className="text-[var(--color-text-primary)] font-heading font-bold mb-6 flex items-center">
-          <span className="w-8 h-8 rounded-lg bg-[rgba(0,212,255,0.1)] text-[var(--color-accent-blue)] flex items-center justify-center mr-3">🗺️</span>
-          Actionable Career Roadmap
-        </h3>
-        <div className="space-y-4">
-          {careerRoadmap.length > 0 ? (
-            careerRoadmap.map((step, idx) => (
-              <div key={idx} className="flex gap-4 p-4 rounded-xl border border-[var(--color-border-light)] bg-[rgba(255,255,255,0.02)]">
-                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[rgba(0,212,255,0.1)] text-[var(--color-accent-blue)] flex items-center justify-center font-bold font-heading">
-                  {idx + 1}
-                </div>
-                <p className="text-sm text-[var(--color-text-secondary)] mt-1.5">{step}</p>
-              </div>
-            ))
-          ) : (
-            <p className="text-sm text-[var(--color-text-disabled)] italic">No roadmap steps provided.</p>
-          )}
+      {/* Refinement Chat V4.0 */}
+      <div className="glass-card p-0 border-2 border-[var(--color-accent-purple)]">
+        <div className="p-4 bg-[rgba(143,0,255,0.1)] border-b border-[var(--color-accent-purple)] flex justify-between items-center">
+          <h3 className="font-heading font-bold text-white flex items-center gap-2">
+            <span>✨</span> Refine with AI
+          </h3>
+        </div>
+        <div className="p-4 bg-[var(--color-bg-tertiary)] text-sm text-[var(--color-text-secondary)]">
+          Want to change something? Ask the AI to rewrite specific bullet points, change the tone, or adjust the length.
+        </div>
+        <div className="p-4">
+          <form onSubmit={handleRefine} className="flex gap-2">
+            <input 
+              type="text" 
+              value={chatInput} 
+              onChange={e => setChatInput(e.target.value)} 
+              placeholder="E.g. Make the summary shorter, or add more technical details to the second job..."
+              className="input-field text-sm flex-1"
+              disabled={isRefining}
+            />
+            <button type="submit" className="btn-primary py-2 px-4" disabled={!chatInput.trim() || isRefining}>
+              {isRefining ? 'Refining...' : 'Send'}
+            </button>
+          </form>
+          {refineError && <p className="text-[var(--color-error)] text-xs mt-2">{refineError}</p>}
         </div>
       </div>
 
@@ -173,7 +235,7 @@ export default function ResultsPanel({ result, onReset }: ResultsPanelProps) {
       <div className="space-y-6">
         <div className="glass-card p-0">
           <div className="p-4 bg-[rgba(255,255,255,0.02)] border-b border-[var(--color-border-medium)] flex justify-between items-center">
-            <h3 className="font-heading font-bold text-[var(--color-text-primary)]">Optimized Resume Content</h3>
+            <h3 className="font-heading font-bold text-[var(--color-text-primary)]">Final Output</h3>
             <button 
               onClick={() => handleCopy(optimizedResume, 'resume')}
               disabled={!optimizedResume}
@@ -182,18 +244,28 @@ export default function ResultsPanel({ result, onReset }: ResultsPanelProps) {
               {copiedSection === 'resume' ? 'Copied!' : 'Copy to Clipboard'}
             </button>
           </div>
-          <div className="p-6 overflow-x-auto">
+          <div className="p-6 overflow-x-auto relative min-h-[200px]">
+             {isRefining && (
+               <div className="absolute inset-0 bg-black/50 flex items-center justify-center backdrop-blur-sm z-10 rounded-b-xl">
+                 <div className="text-white flex flex-col items-center">
+                   <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[var(--color-accent-purple)] mb-2"></div>
+                   <span>Applying refinements...</span>
+                 </div>
+               </div>
+             )}
             {optimizedResume ? (
-              <pre className="whitespace-pre-wrap text-sm text-[var(--color-text-primary)] font-body leading-relaxed">
-                {optimizedResume}
-              </pre>
+              <div className="prose prose-invert max-w-none">
+                 <pre className="whitespace-pre-wrap text-sm text-[var(--color-text-primary)] font-body leading-relaxed">
+                   {optimizedResume}
+                 </pre>
+              </div>
             ) : (
               <p className="text-sm text-[var(--color-text-disabled)] italic">No optimized content generated.</p>
             )}
           </div>
         </div>
 
-        {/* Suggestions & Questions */}
+        {/* Suggestions & Roadmap */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="glass-card p-6">
             <h3 className="font-heading font-bold text-[var(--color-text-primary)] mb-4">Actionable Suggestions</h3>
@@ -211,17 +283,22 @@ export default function ResultsPanel({ result, onReset }: ResultsPanelProps) {
             )}
           </div>
           <div className="glass-card p-6">
-            <h3 className="font-heading font-bold text-[var(--color-text-primary)] mb-4">Follow-up Questions</h3>
+            <h3 className="font-heading font-bold text-[var(--color-text-primary)] mb-6 flex items-center">
+              <span className="w-6 h-6 rounded-lg bg-[rgba(0,212,255,0.1)] text-[var(--color-accent-blue)] flex items-center justify-center mr-3 text-sm">🗺️</span>
+              Career Roadmap
+            </h3>
             <div className="space-y-4">
-              {Object.keys(smartQuestions).length > 0 ? (
-                Object.entries(smartQuestions).map(([q, a], idx) => (
-                  <div key={idx} className="text-sm">
-                    <p className="font-semibold text-[var(--color-text-primary)]">{q}</p>
-                    <p className="text-[var(--color-text-secondary)] mt-1 italic">{a || 'Requires your input for further optimization'}</p>
+              {careerRoadmap.length > 0 ? (
+                careerRoadmap.map((step, idx) => (
+                  <div key={idx} className="flex gap-4 p-3 rounded-xl border border-[var(--color-border-light)] bg-[rgba(255,255,255,0.02)]">
+                    <div className="flex-shrink-0 w-6 h-6 rounded-full bg-[rgba(0,212,255,0.1)] text-[var(--color-accent-blue)] flex items-center justify-center font-bold font-heading text-xs">
+                      {idx + 1}
+                    </div>
+                    <p className="text-xs text-[var(--color-text-secondary)] mt-1">{step}</p>
                   </div>
                 ))
               ) : (
-                <p className="text-sm text-[var(--color-text-disabled)] italic">No follow-up questions available.</p>
+                <p className="text-sm text-[var(--color-text-disabled)] italic">No roadmap steps provided.</p>
               )}
             </div>
           </div>

@@ -18,8 +18,11 @@ export default function Home() {
           <Link href="/settings" className="text-sm font-medium text-[var(--color-text-secondary)] hover:text-white transition-colors">
             Settings
           </Link>
+          <Link href="/profile" className="text-sm font-medium text-[var(--color-text-secondary)] hover:text-white transition-colors">
+            Profile Hub
+          </Link>
           <Link href="/builder" className="btn-primary text-sm px-4 py-2">
-            Sign In
+            Builder Mode
           </Link>
         </div>
       </nav>

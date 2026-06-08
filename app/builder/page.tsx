@@ -15,6 +15,7 @@ export default function Home() {
     resumeBase64: '',
     resumeFileName: '',
     jobDescription: '',
+    path: 'A', // V4.0 Addition
     memory: defaultMemory as CandidateMemory,
     preferences: {
       tone: 'professional',
@@ -27,12 +28,28 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<OptimizeResponse | null>(null);
 
+  React.useEffect(() => {
+    import('@/lib/memory').then(({ loadMemoryFromLocal }) => {
+      setFormData(prev => ({ ...prev, memory: loadMemoryFromLocal() }));
+    });
+  }, []);
+
   const nextStep = () => setStep((s) => s + 1);
   const prevStep = () => setStep((s) => s - 1);
 
-  const handleStepOne = (data: { resumeBase64: string; fileName: string }) => {
-    setFormData((prev) => ({ ...prev, resumeBase64: data.resumeBase64, resumeFileName: data.fileName }));
-    nextStep();
+  const handleStepOne = (data: { resumeBase64: string; fileName: string; path: 'A' | 'B' }) => {
+    setFormData((prev) => ({ 
+      ...prev, 
+      resumeBase64: data.resumeBase64, 
+      resumeFileName: data.fileName,
+      path: data.path
+    }));
+    if (data.path === 'A') {
+      nextStep();
+    } else {
+      setFormData((prev) => ({ ...prev, jobDescription: '[CAREER_ASSESSMENT_MODE]' }));
+      setStep(4); // Skip to preferences
+    }
   };
 
   const handleStepTwo = (jobDescription: string) => {

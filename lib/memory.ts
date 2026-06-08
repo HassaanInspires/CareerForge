@@ -6,6 +6,7 @@ export interface CandidateMemory {
   verifiableMetrics: string[];
   careerGoals: string;
   identifiedGaps: string[];
+  careerLevel: string; // V4.0 Addition
   // Tracks if the AI has enough information to generate a highly competitive resume
   dataSufficiencyScore: number; 
 }
@@ -15,8 +16,33 @@ export const defaultMemory: CandidateMemory = {
   verifiableMetrics: [],
   careerGoals: '',
   identifiedGaps: [],
+  careerLevel: 'Entry Level',
   dataSufficiencyScore: 0
 };
+
+// V4.0 Local Storage Helpers
+export const MEMORY_STORAGE_KEY = 'cf_permanent_memory';
+export const RESUME_STORAGE_KEY = 'cf_master_resume';
+
+export function saveMemoryToLocal(memory: CandidateMemory) {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(MEMORY_STORAGE_KEY, JSON.stringify(memory));
+  }
+}
+
+export function loadMemoryFromLocal(): CandidateMemory {
+  if (typeof window !== 'undefined') {
+    const stored = localStorage.getItem(MEMORY_STORAGE_KEY);
+    if (stored) {
+      try {
+        return JSON.parse(stored) as CandidateMemory;
+      } catch (e) {
+        console.error("Failed to parse local memory");
+      }
+    }
+  }
+  return defaultMemory;
+}
 
 /**
  * Updates the candidate's permanent memory profile based on the latest chat interaction.
@@ -42,6 +68,7 @@ CRITICAL GUARDRAILS:
 2. IGNORE fluff, opinions, or AI buzzwords.
 3. DO NOT hallucinate. If the user didn't explicitly say it, do not add it.
 4. Update the dataSufficiencyScore based on how close we are to having all the metrics needed for the Job Description. (Score > 85 means we are ready to build).
+5. Infer the candidate's career level (e.g., "Entry Level", "Mid Level", "Senior", "Executive").
 
 --- CURRENT MEMORY ---
 ${JSON.stringify(currentMemory, null, 2)}
@@ -58,6 +85,7 @@ Return ONLY a valid JSON object matching this exact structure, with the updated 
   "verifiableMetrics": ["increased sales by 20%", "managed team of 5"],
   "careerGoals": "summary of their stated goals",
   "identifiedGaps": ["missing AWS certification", "needs more leadership examples"],
+  "careerLevel": "Senior",
   "dataSufficiencyScore": 75
 }
 `;
@@ -74,6 +102,7 @@ Return ONLY a valid JSON object matching this exact structure, with the updated 
       verifiableMetrics: newMemory.verifiableMetrics || currentMemory.verifiableMetrics || [],
       careerGoals: newMemory.careerGoals || currentMemory.careerGoals || '',
       identifiedGaps: newMemory.identifiedGaps || currentMemory.identifiedGaps || [],
+      careerLevel: newMemory.careerLevel || currentMemory.careerLevel || 'Entry Level',
       dataSufficiencyScore: newMemory.dataSufficiencyScore || currentMemory.dataSufficiencyScore || 0
     };
   } catch (err) {

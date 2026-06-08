@@ -67,9 +67,12 @@ export interface OptimizeResponse {
   careerRoadmap: string[];
   gapAnalysis: string[];
   marketEvaluation: string;
-  precisionScore: {
-    atsCompatibility: number;
-    humanReadability: number;
+  advancedScore: {
+    overall: number;
+    atsParsability: number;
+    impactDensity: number;
+    keywordAlignment: number;
+    explanation: string;
   };
 }
 

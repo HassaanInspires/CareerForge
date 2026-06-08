@@ -65,18 +65,35 @@ export function generatePrompt(
 ): string {
   const { tone, length, focus } = preferences;
 
-  let prompt = `You are an elite, highly critical AI Career Consultant.
-Your mission is to generate a highly optimized resume that is 100% authentic, verifiable, and free of generic AI buzzwords.
+  const isCareerAssessment = jobDescription === '[CAREER_ASSESSMENT_MODE]';
+
+  const systemRole = isCareerAssessment 
+    ? "You are an elite AI Executive Career Coach. Your goal is to evaluate the candidate's career level, market fit, and suggest optimal job roles."
+    : "You are an elite, highly critical AI Career Consultant. Your mission is to generate a highly optimized resume that is 100% authentic, verifiable, and free of generic AI buzzwords.";
+
+  const outputFormat = isCareerAssessment
+    ? `
+5. Provide an 'advancedScore' object evaluating 'overall' (0-100), 'atsParsability' (0-100), 'impactDensity' (0-100), 'keywordAlignment' (0-100), and an 'explanation'.
+6. In 'optimizedResume', output a comprehensive Markdown report detailing their Career Level, Market Fit, Salary Estimates, and Next Steps.
+`
+    : `
+5. Provide an 'advancedScore' object evaluating 'overall' (0-100), 'atsParsability' (0-100), 'impactDensity' (0-100), 'keywordAlignment' (0-100), and an 'explanation' string explaining the score.
+6. Provide a 'gapAnalysis' array detailing blocking factors.
+7. Provide a 'careerRoadmap' array outlining actionable steps to bridge the gaps.
+8. Use Chain-of-Thought reasoning. First, output a <thought> block evaluating the gaps and deciding how to frame the authentic metrics. Then, output exactly the JSON structure requested.
+`;
+
+  let prompt = `${systemRole}
 
 --- VERIFIED CANDIDATE MEMORY ---
+Career Level: ${memory.careerLevel || 'Unknown'}
 Core Skills: ${memory.coreSkills.join(', ')}
 Verifiable Metrics: ${memory.verifiableMetrics.join(', ')}
 
 --- ORIGINAL RESUME ---
 ${resume}
 
---- TARGET JOB DESCRIPTION ---
-${jobDescription}
+${isCareerAssessment ? '' : `--- TARGET JOB DESCRIPTION ---\n${jobDescription}`}
 
 --- PREFERENCES ---
 Tone: ${tone}
@@ -88,10 +105,7 @@ STRICT GUARDRAILS & AUTHENTICITY RULES:
 2. DO NOT hallucinate numbers, skills, or projects under any circumstances.
 3. Remove generic AI words (e.g., "Spearheaded", "Synergized", "Delved", "Navigated"). Use plain, powerful verbs (e.g., "Led", "Built", "Managed").
 4. If a skill required by the JD is missing, DO NOT add it to the resume. Instead, list it in the "missingSkills" array.
-5. Provide a precisionScore object evaluating 'atsCompatibility' (0-100) and 'humanReadability' (0-100).
-6. Provide a 'gapAnalysis' array detailing blocking factors.
-7. Provide a 'careerRoadmap' array outlining actionable steps to bridge the gaps.
-8. Use Chain-of-Thought reasoning. First, output a <thought> block evaluating the gaps and deciding how to frame the authentic metrics. Then, output exactly the JSON structure requested.
+${outputFormat}
 
 Format your output EXACTLY as follows:
 
@@ -104,12 +118,12 @@ Format your output EXACTLY as follows:
   "matchScore": 85,
   "breakdown": { "keywordMatch": 80, "experienceMatch": 90, "skillsMatch": 85, "toneMatch": 85 },
   "missingSkills": [ { "name": "React", "category": "hard", "importance": "high" } ],
-  "smartQuestions": { "System Notice": "Dynamic questions are now handled by the Memory Engine." },
+  "smartQuestions": { "System Notice": "Handled by Memory Engine" },
   "suggestions": ["suggestion1"],
   "careerRoadmap": ["step1", "step2"],
   "gapAnalysis": ["gap1", "gap2"],
   "marketEvaluation": "market details",
-  "precisionScore": { "atsCompatibility": 85, "humanReadability": 90 }
+  "advancedScore": { "overall": 85, "atsParsability": 90, "impactDensity": 70, "keywordAlignment": 80, "explanation": "Brief explanation of the score" }
 }`;
 
   return prompt;

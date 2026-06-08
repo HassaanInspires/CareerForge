@@ -1,126 +1,83 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { RESUME_STORAGE_KEY } from '@/lib/memory';
 
 interface StepOneProps {
-  onNext: (data: { resumeBase64: string; fileName: string }) => void;
+  onNext: (data: { resumeBase64: string; fileName: string; path: 'A' | 'B' }) => void;
   onError: (error: string) => void;
 }
 
 export default function StepOne({ onNext, onError }: StepOneProps) {
-  const [isExtracting, setIsExtracting] = useState(false);
-  const [fileName, setFileName] = useState<string | null>(null);
+  const [hasResume, setHasResume] = useState<boolean | null>(null);
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  useEffect(() => {
+    const res = localStorage.getItem(RESUME_STORAGE_KEY);
+    setHasResume(!!res);
+  }, []);
 
-    // Validation: PDF, DOCX, DOC
-    const allowedTypes = [
-      'application/pdf',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/msword'
-    ];
-    
-    const extension = file.name.split('.').pop()?.toLowerCase();
-    const isAllowedExtension = ['pdf', 'docx', 'doc'].includes(extension || '');
-
-    if (!allowedTypes.includes(file.type) && !isAllowedExtension) {
-      onError('Please upload a PDF or Word document (.docx, .doc).');
+  const handleSelectPath = (path: 'A' | 'B') => {
+    const base64 = localStorage.getItem(RESUME_STORAGE_KEY);
+    if (!base64) {
+      onError('Master CV not found. Please upload it in the Profile Hub.');
       return;
     }
-
-    if (file.size > 5 * 1024 * 1024) {
-      onError('File size must be less than 5MB.');
-      return;
-    }
-
-    setIsExtracting(true);
-    setFileName(file.name);
-
-    try {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64String = reader.result as string;
-        const base64 = base64String.split(',')[1];
-        setIsExtracting(false);
-        onNext({ resumeBase64: base64, fileName: file.name });
-      };
-      reader.onerror = () => {
-        setIsExtracting(false);
-        onError('Failed to read file.');
-      };
-      reader.readAsDataURL(file);
-    } catch (err) {
-      setIsExtracting(false);
-      onError('An error occurred during file processing.');
-    }
+    onNext({ resumeBase64: base64, fileName: 'MasterCV.pdf', path });
   };
+
+  if (hasResume === null) return <div className="p-12 text-center">Loading...</div>;
+
+  if (!hasResume) {
+    return (
+      <div className="space-y-6 animate-fade-in text-center p-12">
+        <h2 className="text-2xl font-bold text-white mb-2">Master CV Required</h2>
+        <p className="text-[var(--color-text-secondary)] mb-6 max-w-md mx-auto">
+          CareerForge V4.0 uses a centralized Candidate Memory graph. You must upload your Master CV in the Profile Hub before starting an assessment.
+        </p>
+        <Link href="/profile" className="btn-primary">
+          Go to Profile Hub
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="text-center">
-        <h2 className="text-2xl font-heading font-bold text-[var(--color-text-primary)]">Upload your Resume</h2>
+      <div className="text-center mb-8">
+        <h2 className="text-2xl font-heading font-bold text-[var(--color-text-primary)]">Select Assessment Mode</h2>
         <p className="mt-2 text-sm text-[var(--color-text-secondary)]">
-          Upload your resume in PDF or Word format (max 5MB).
+          Choose how you want to leverage your Candidate Memory Graph today.
         </p>
       </div>
 
-      <div 
-        className="mt-8 flex justify-center px-6 pt-10 pb-10 border-2 border-[var(--color-border-medium)] border-dashed rounded-xl hover:border-[var(--color-accent-blue)] hover:bg-[rgba(0,212,255,0.05)] transition-all duration-300 relative group cursor-pointer"
-        onClick={() => document.getElementById('file-upload')?.click()}
-      >
-        <div className="space-y-2 text-center">
-          <svg
-            className="mx-auto h-12 w-12 text-[var(--color-text-disabled)] group-hover:text-[var(--color-accent-blue)] transition-colors animate-float"
-            stroke="currentColor"
-            fill="none"
-            viewBox="0 0 48 48"
-            aria-hidden="true"
-          >
-            <path
-              d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-          <div className="flex justify-center text-sm">
-            <label
-              htmlFor="file-upload"
-              className="relative cursor-pointer font-medium text-[var(--color-accent-blue)] group-hover:text-[var(--color-accent-blue-dark)] focus-within:outline-none"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <span>Upload a file</span>
-              <input
-                id="file-upload"
-                name="file-upload"
-                type="file"
-                accept=".pdf,.docx,.doc"
-                className="sr-only"
-                onChange={handleFileChange}
-                disabled={isExtracting}
-              />
-            </label>
-            <p className="pl-1 text-[var(--color-text-secondary)]">or drag and drop</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <button 
+          onClick={() => handleSelectPath('A')}
+          className="flex flex-col items-center p-8 text-center border-2 border-[var(--color-border-medium)] rounded-xl hover:border-[var(--color-accent-blue)] bg-[var(--color-bg-tertiary)] transition-all"
+        >
+          <div className="w-16 h-16 rounded-full bg-[rgba(59,130,246,0.1)] flex items-center justify-center mb-4">
+            <span className="text-2xl">🎯</span>
           </div>
-          <p className="text-xs text-[var(--color-text-disabled)]">PDF or DOCX up to 5MB</p>
-        </div>
-      </div>
+          <h3 className="text-lg font-bold text-white mb-2">Target a Specific Job</h3>
+          <p className="text-sm text-[var(--color-text-secondary)]">
+            Paste a job description. The AI will interview you for missing gaps and generate a highly targeted resume.
+          </p>
+        </button>
 
-      {fileName && (
-        <div className="mt-4 flex items-center justify-between p-4 bg-[rgba(0,212,255,0.1)] rounded-xl border border-[var(--color-accent-blue)] animate-slide-up">
-          <div className="flex items-center">
-            <span className="text-sm font-medium text-[var(--color-accent-blue)]">{fileName}</span>
+        <button 
+          onClick={() => handleSelectPath('B')}
+          className="flex flex-col items-center p-8 text-center border-2 border-[var(--color-border-medium)] rounded-xl hover:border-[var(--color-accent-purple)] bg-[var(--color-bg-tertiary)] transition-all"
+        >
+          <div className="w-16 h-16 rounded-full bg-[rgba(143,0,255,0.1)] flex items-center justify-center mb-4">
+            <span className="text-2xl">🧭</span>
           </div>
-          {isExtracting && (
-            <div className="flex items-center">
-              <div className="animate-spin-slow rounded-full h-4 w-4 border-b-2 border-t-2 border-[var(--color-accent-blue)] mr-2"></div>
-              <span className="text-xs text-[var(--color-accent-blue)]">Processing...</span>
-            </div>
-          )}
-        </div>
-      )}
+          <h3 className="text-lg font-bold text-white mb-2">Career Level Assessment</h3>
+          <p className="text-sm text-[var(--color-text-secondary)]">
+            Let the AI evaluate your permanent memory to determine your market level and suggest suitable job titles.
+          </p>
+        </button>
+      </div>
     </div>
   );
 }
