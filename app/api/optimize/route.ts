@@ -3,6 +3,7 @@ import { extractTextFromFile } from '@/lib/documentParser';
 import { getProvider } from '@/lib/llm-providers';
 import { generatePrompt } from '@/lib/utils';
 import { OptimizeRequest, OptimizeResponse } from '@/lib/types';
+import { defaultMemory } from '@/lib/memory';
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest) {
       provider: providerName,
       model,
       userApiKey,
-      smartQuestions = {},
+      memory,
       preferences = {
         tone: 'professional',
         length: 'standard',
@@ -49,7 +50,7 @@ export async function POST(req: NextRequest) {
     const provider = getProvider(providerName);
     
     // 3. Generate Prompt
-    const prompt = generatePrompt(resumeText, jobDescription, smartQuestions, preferences);
+    const prompt = generatePrompt(resumeText, jobDescription, memory || defaultMemory, preferences);
 
     // 4. Call LLM API
     let rawResponse = '';

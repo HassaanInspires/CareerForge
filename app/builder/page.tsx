@@ -6,7 +6,8 @@ import StepTwo from '@/components/StepTwo';
 import StepThree from '@/components/StepThree';
 import StepFour from '@/components/StepFour';
 import ResultsPanel from '@/components/ResultsPanel';
-import { SmartQuestions, Provider, OptimizeResponse } from '@/lib/types';
+import { Provider, OptimizeResponse } from '@/lib/types';
+import { CandidateMemory, defaultMemory } from '@/lib/memory';
 
 export default function Home() {
   const [step, setStep] = useState(1);
@@ -14,7 +15,7 @@ export default function Home() {
     resumeBase64: '',
     resumeFileName: '',
     jobDescription: '',
-    smartQuestions: {} as SmartQuestions,
+    memory: defaultMemory as CandidateMemory,
     preferences: {
       tone: 'professional',
       length: 'standard',
@@ -39,8 +40,8 @@ export default function Home() {
     nextStep();
   };
 
-  const handleStepThree = (questions: SmartQuestions) => {
-    setFormData((prev) => ({ ...prev, smartQuestions: questions }));
+  const handleStepThree = (memory: CandidateMemory) => {
+    setFormData((prev) => ({ ...prev, memory }));
     nextStep();
   };
 
@@ -70,7 +71,7 @@ export default function Home() {
           provider: config.provider,
           model: config.model,
           userApiKey: config.apiKey,
-          smartQuestions: formData.smartQuestions,
+          memory: formData.memory,
           preferences: formData.preferences,
           // outputOptions could be added to payload if backend handles it
         }),
@@ -99,8 +100,13 @@ export default function Home() {
       resumeBase64: '',
       resumeFileName: '',
       jobDescription: '',
-      smartQuestions: {},
-      selectedPreferences: [],
+      memory: defaultMemory as CandidateMemory,
+      preferences: {
+        tone: 'professional',
+        length: 'standard',
+        focus: 'skills',
+      } as any,
+      outputOptions: [],
     });
   };
 
@@ -145,7 +151,7 @@ export default function Home() {
             )}
             {step === 3 && (
               <StepThree 
-                currentData={formData.smartQuestions} 
+                currentMemory={formData.memory} 
                 resumeBase64={formData.resumeBase64}
                 jobDescription={formData.jobDescription}
                 onNext={handleStepThree} 

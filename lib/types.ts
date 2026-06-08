@@ -2,6 +2,7 @@
  * Supported AI model providers
  */
 export type Provider = 'anthropic' | 'openai' | 'gemini' | 'groq' | 'mistral';
+import { CandidateMemory } from './memory';
 
 /**
  * User preferences for optimization
@@ -48,7 +49,7 @@ export interface OptimizeRequest {
   provider: Provider;
   model: string;
   preferences: Preferences;
-  smartQuestions?: SmartQuestions;
+  memory?: CandidateMemory;
   userApiKey?: string;
   additionalContext?: string;
 }

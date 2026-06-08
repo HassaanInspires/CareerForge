@@ -1,4 +1,5 @@
-import { Preferences, SmartQuestions } from './types';
+import { Preferences } from './types';
+import { CandidateMemory } from './memory';
 
 /**
  * Calculates a weighted match score based on various criteria
@@ -59,19 +60,22 @@ export function formatDate(date: Date): string {
 export function generatePrompt(
   resume: string,
   jobDescription: string,
-  questions: SmartQuestions,
+  memory: CandidateMemory,
   preferences: Preferences
 ): string {
   const { tone, length, focus } = preferences;
 
-  let prompt = `You are an expert career coach and resume optimizer. 
-    
-Analyze the following resume and job description. 
-    
---- RESUME ---
+  let prompt = `You are an elite, highly critical AI Career Consultant.
+Your mission is to generate a highly optimized resume that is 100% authentic, verifiable, and free of generic AI buzzwords.
+
+--- VERIFIED CANDIDATE MEMORY ---
+Core Skills: ${memory.coreSkills.join(', ')}
+Verifiable Metrics: ${memory.verifiableMetrics.join(', ')}
+
+--- ORIGINAL RESUME ---
 ${resume}
 
---- JOB DESCRIPTION ---
+--- TARGET JOB DESCRIPTION ---
 ${jobDescription}
 
 --- PREFERENCES ---
@@ -79,27 +83,28 @@ Tone: ${tone}
 Length: ${length}
 Focus: ${focus}
 
---- ADDITIONAL CONTEXT FROM USER ---
-${Object.entries(questions)
-  .map(([q, a]) => `Q: ${q}\nA: ${a}`)
-  .join('\n')}
+STRICT GUARDRAILS & AUTHENTICITY RULES:
+1. ONLY include metrics and facts from the "VERIFIED CANDIDATE MEMORY" or the "ORIGINAL RESUME".
+2. DO NOT hallucinate numbers, skills, or projects under any circumstances.
+3. Remove generic AI words (e.g., "Spearheaded", "Synergized", "Delved", "Navigated"). Use plain, powerful verbs (e.g., "Led", "Built", "Managed").
+4. If a skill required by the JD is missing, DO NOT add it to the resume. Instead, list it in the "missingSkills" array.
+5. Provide a precisionScore object evaluating 'atsCompatibility' (0-100) and 'humanReadability' (0-100).
+6. Provide a 'gapAnalysis' array detailing blocking factors.
+7. Provide a 'careerRoadmap' array outlining actionable steps to bridge the gaps.
+8. Use Chain-of-Thought reasoning. First, output a <thought> block evaluating the gaps and deciding how to frame the authentic metrics. Then, output exactly the JSON structure requested.
 
-INSTRUCTIONS:
-1. Rewrite the resume to better align with the job description.
-2. Maintain a ${tone} tone and a ${length} length.
-3. Focus heavily on ${focus}.
-4. Provide a match score (0-100), a breakdown of the match, missing skills, and smart questions for further optimization.
-5. Provide a 'precisionScore' object with 'atsCompatibility' (0-100) and 'humanReadability' (0-100).
-6. Provide a 'gapAnalysis' array of strings detailing specific blocking factors or missing qualifications.
-7. Provide a 'careerRoadmap' array of strings with actionable steps (courses, certs, experiences) to bridge skill gaps.
-8. Provide a 'marketEvaluation' string summarizing the market demand and recommendations for this role.
-9. Format the entire output EXACTLY as this JSON structure: 
+Format your output EXACTLY as follows:
+
+<thought>
+(Your reasoning here)
+</thought>
+
 {
   "optimizedResume": "...",
   "matchScore": 85,
   "breakdown": { "keywordMatch": 80, "experienceMatch": 90, "skillsMatch": 85, "toneMatch": 85 },
   "missingSkills": [ { "name": "React", "category": "hard", "importance": "high" } ],
-  "smartQuestions": { "question1": "answer1" },
+  "smartQuestions": { "System Notice": "Dynamic questions are now handled by the Memory Engine." },
   "suggestions": ["suggestion1"],
   "careerRoadmap": ["step1", "step2"],
   "gapAnalysis": ["gap1", "gap2"],
