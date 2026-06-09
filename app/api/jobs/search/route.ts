@@ -154,7 +154,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { 
+    let { 
       query = '', 
       location = '', 
       provider: providerName, 
@@ -163,6 +163,29 @@ export async function POST(req: NextRequest) {
       tavilyApiKey = '',
       depth = 'quick' // 'quick' (5 jobs) or 'deep' (15 jobs)
     } = body;
+
+    // Load settings from Database if missing
+    let dbKeys: Record<string, string> = {};
+    let dbModels: Record<string, string> = {};
+    if (user.apiKeys) {
+      try { dbKeys = JSON.parse(user.apiKeys); } catch (e) {}
+    }
+    if (user.selectedModels) {
+      try { dbModels = JSON.parse(user.selectedModels); } catch (e) {}
+    }
+
+    if (!providerName) {
+      providerName = user.activeProvider || 'anthropic';
+    }
+    if (!model) {
+      model = dbModels[providerName] || '';
+    }
+    if (!userApiKey) {
+      userApiKey = dbKeys[providerName] || '';
+    }
+    if (!tavilyApiKey) {
+      tavilyApiKey = user.tavilyKey || '';
+    }
 
     if (!providerName || !model) {
       return NextResponse.json({ error: 'LLM provider and model are required' }, { status: 400 });

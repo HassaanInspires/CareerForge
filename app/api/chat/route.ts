@@ -4,6 +4,7 @@ import { updateMemory, CandidateMemory, defaultMemory } from '@/lib/memory';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { searchCareerChunks } from '@/lib/vector';
+import { prisma } from '@/lib/prisma';
 
 export async function POST(req: NextRequest) {
   try {
@@ -12,16 +13,47 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email }
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
     const body = await req.json();
-    const { 
+    let { 
       messages, 
       jobDescription, 
       memory, 
       provider: providerName, 
       model, 
       userApiKey,
-      realism = 'brutal'
+      realism
     } = body;
+
+    // Load configurations from Database settings if missing
+    let dbKeys: Record<string, string> = {};
+    let dbModels: Record<string, string> = {};
+    if (user.apiKeys) {
+      try { dbKeys = JSON.parse(user.apiKeys); } catch (e) {}
+    }
+    if (user.selectedModels) {
+      try { dbModels = JSON.parse(user.selectedModels); } catch (e) {}
+    }
+
+    if (!providerName) {
+      providerName = user.activeProvider || 'anthropic';
+    }
+    if (!model) {
+      model = dbModels[providerName] || '';
+    }
+    if (!userApiKey) {
+      userApiKey = dbKeys[providerName] || '';
+    }
+    if (!realism) {
+      realism = user.aiRealism || 'brutal';
+    }
 
     if (!jobDescription || !providerName || !model) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });

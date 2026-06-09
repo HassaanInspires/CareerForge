@@ -1,10 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getProvider } from '@/lib/llm-providers';
 import { Provider } from '@/lib/types';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 
 export async function POST(req: NextRequest) {
   try {
-    const { targetSkill, roleContext, provider: providerName, model, userApiKey } = await req.json();
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user || !session.user.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email }
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    const body = await req.json();
+    let { targetSkill, roleContext, provider: providerName, model, userApiKey } = body;
+
+    // Load configurations from Database settings if missing
+    let dbKeys: Record<string, string> = {};
+    let dbModels: Record<string, string> = {};
+    if (user.apiKeys) {
+      try { dbKeys = JSON.parse(user.apiKeys); } catch (e) {}
+    }
+    if (user.selectedModels) {
+      try { dbModels = JSON.parse(user.selectedModels); } catch (e) {}
+    }
+
+    if (!providerName) {
+      providerName = user.activeProvider || 'anthropic';
+    }
+    if (!model) {
+      model = dbModels[providerName] || '';
+    }
+    if (!userApiKey) {
+      userApiKey = dbKeys[providerName] || '';
+    }
 
     if (!targetSkill || !providerName || !model) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });

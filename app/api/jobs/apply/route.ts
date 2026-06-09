@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const {
+    let {
       title,
       company,
       url,
@@ -31,6 +31,26 @@ export async function POST(req: NextRequest) {
       model,
       userApiKey
     } = body;
+
+    // Load configurations from Database settings if missing
+    let dbKeys: Record<string, string> = {};
+    let dbModels: Record<string, string> = {};
+    if (user.apiKeys) {
+      try { dbKeys = JSON.parse(user.apiKeys); } catch (e) {}
+    }
+    if (user.selectedModels) {
+      try { dbModels = JSON.parse(user.selectedModels); } catch (e) {}
+    }
+
+    if (!providerName) {
+      providerName = user.activeProvider || 'anthropic';
+    }
+    if (!model) {
+      model = dbModels[providerName] || '';
+    }
+    if (!userApiKey) {
+      userApiKey = dbKeys[providerName] || '';
+    }
 
     if (!title || !company || !providerName || !model) {
       return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });

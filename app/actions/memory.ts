@@ -206,3 +206,57 @@ export async function saveUserChatLog(chatLog: any[]) {
 
   return { success: true };
 }
+
+export async function loadUserSettings() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.email) return null;
+
+  const user = await prisma.user.findUnique({
+    where: { email: session.user.email }
+  });
+
+  if (!user) return null;
+
+  let apiKeys: Record<string, string> = {};
+  let selectedModels: Record<string, string> = {};
+  try { apiKeys = JSON.parse(user.apiKeys || '{}'); } catch (e) {}
+  try { selectedModels = JSON.parse(user.selectedModels || '{}'); } catch (e) {}
+
+  return {
+    apiKeys,
+    selectedModels,
+    activeProvider: user.activeProvider || 'anthropic',
+    aiRealism: user.aiRealism || 'brutal',
+    tavilyKey: user.tavilyKey || ''
+  };
+}
+
+export async function saveUserSettings(settings: {
+  apiKeys: Record<string, string>;
+  selectedModels: Record<string, string>;
+  activeProvider: string;
+  aiRealism: string;
+  tavilyKey: string;
+}) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.email) throw new Error('Not authenticated');
+
+  const user = await prisma.user.findUnique({
+    where: { email: session.user.email }
+  });
+
+  if (!user) throw new Error('User not found');
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      apiKeys: JSON.stringify(settings.apiKeys),
+      selectedModels: JSON.stringify(settings.selectedModels),
+      activeProvider: settings.activeProvider,
+      aiRealism: settings.aiRealism,
+      tavilyKey: settings.tavilyKey
+    }
+  });
+
+  return { success: true };
+}

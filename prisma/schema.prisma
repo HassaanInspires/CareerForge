@@ -11,18 +11,25 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String?
-  role      String   @default("USER") // "USER" | "ADMIN"
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String   @id @default(cuid())
+  email           String   @unique
+  password        String
+  name            String?
+  role            String   @default("USER") // "USER" | "ADMIN"
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  memory    CandidateMemory?
-  proofOfWork ProofOfWork[]
-  sessions  SessionHistory[]
-  chunks    CareerChunk[]
+  // Settings persistence
+  apiKeys         String?  @default("{}")
+  selectedModels  String?  @default("{}")
+  activeProvider  String   @default("anthropic")
+  aiRealism       String   @default("brutal")
+  tavilyKey       String?  @default("")
+
+  memory          CandidateMemory?
+  proofOfWork     ProofOfWork[]
+  sessions        SessionHistory[]
+  chunks          CareerChunk[]
 }
 
 model CandidateMemory {

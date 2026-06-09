@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { loadUserSettings, saveUserSettings } from '@/app/actions/memory';
 
 export default function SettingsPage() {
   const [activeProvider, setActiveProvider] = useState('anthropic');
@@ -22,36 +23,59 @@ export default function SettingsPage() {
   ];
 
   useEffect(() => {
-    // Load from local storage
-    const savedProvider = localStorage.getItem('cf_provider');
-    if (savedProvider) setActiveProvider(savedProvider);
+    const loadSettings = async () => {
+      try {
+        const dbSettings = await loadUserSettings();
+        if (dbSettings) {
+          setActiveProvider(dbSettings.activeProvider);
+          setRealism(dbSettings.aiRealism);
+          setTavilyKey(dbSettings.tavilyKey);
+          setKeys(dbSettings.apiKeys || {});
+          setSelectedModels(dbSettings.selectedModels || {});
 
-    const savedRealism = localStorage.getItem('cf_ai_realism');
-    if (savedRealism) setRealism(savedRealism);
+          // Fetch models for active/loaded keys
+          Object.entries(dbSettings.apiKeys || {}).forEach(([providerId, key]) => {
+            if (key) {
+              fetchModels(providerId, key);
+            }
+          });
+        } else {
+          // Fallback to local storage
+          const savedProvider = localStorage.getItem('cf_provider');
+          if (savedProvider) setActiveProvider(savedProvider);
 
-    const savedTavily = localStorage.getItem('cf_tavily_key') || '';
-    setTavilyKey(savedTavily);
+          const savedRealism = localStorage.getItem('cf_ai_realism');
+          if (savedRealism) setRealism(savedRealism);
 
-    const loadedKeys: { [key: string]: string } = {};
-    const loadedModels: { [key: string]: string } = {};
-    
-    providers.forEach(p => {
-      const key = localStorage.getItem(`cf_key_${p.id}`);
-      if (key) loadedKeys[p.id] = key;
-      
-      const model = localStorage.getItem(`cf_model_${p.id}`);
-      if (model) loadedModels[p.id] = model;
-    });
-    
-    setKeys(loadedKeys);
-    setSelectedModels(loadedModels);
+          const savedTavily = localStorage.getItem('cf_tavily_key') || '';
+          setTavilyKey(savedTavily);
 
-    // Initial fetch for providers with keys
-    Object.keys(loadedKeys).forEach(providerId => {
-      if (loadedKeys[providerId]) {
-        fetchModels(providerId, loadedKeys[providerId]);
+          const loadedKeys: { [key: string]: string } = {};
+          const loadedModels: { [key: string]: string } = {};
+          
+          providers.forEach(p => {
+            const key = localStorage.getItem(`cf_key_${p.id}`);
+            if (key) loadedKeys[p.id] = key;
+            
+            const model = localStorage.getItem(`cf_model_${p.id}`);
+            if (model) loadedModels[p.id] = model;
+          });
+          
+          setKeys(loadedKeys);
+          setSelectedModels(loadedModels);
+
+          Object.keys(loadedKeys).forEach(providerId => {
+            if (loadedKeys[providerId]) {
+              fetchModels(providerId, loadedKeys[providerId]);
+            }
+          });
+        }
+      } catch (err) {
+        console.error("Failed to load user settings:", err);
       }
-    });
+    };
+
+    loadSettings();
   }, []);
 
   const fetchModels = async (providerId: string, apiKey: string) => {
@@ -89,18 +113,32 @@ export default function SettingsPage() {
     }
   };
 
-  const handleSave = () => {
-    localStorage.setItem('cf_provider', activeProvider);
-    localStorage.setItem('cf_ai_realism', realism);
-    localStorage.setItem('cf_tavily_key', tavilyKey);
-    Object.entries(keys).forEach(([provider, key]) => {
-      localStorage.setItem(`cf_key_${provider}`, key);
-    });
-    Object.entries(selectedModels).forEach(([provider, model]) => {
-      localStorage.setItem(`cf_model_${provider}`, model);
-    });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const handleSave = async () => {
+    try {
+      await saveUserSettings({
+        apiKeys: keys,
+        selectedModels,
+        activeProvider,
+        aiRealism: realism,
+        tavilyKey
+      });
+
+      // Local storage sync for backup / offline support
+      localStorage.setItem('cf_provider', activeProvider);
+      localStorage.setItem('cf_ai_realism', realism);
+      localStorage.setItem('cf_tavily_key', tavilyKey);
+      Object.entries(keys).forEach(([provider, key]) => {
+        localStorage.setItem(`cf_key_${provider}`, key);
+      });
+      Object.entries(selectedModels).forEach(([provider, model]) => {
+        localStorage.setItem(`cf_model_${provider}`, model);
+      });
+
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } catch (err) {
+      console.error("Failed to save settings:", err);
+    }
   };
 
   return (

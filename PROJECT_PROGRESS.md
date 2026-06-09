@@ -75,6 +75,14 @@ Started with:
     *   **Pitch & Proposal strategy endpoint (`/api/jobs/apply`)**: A server handler that pulls candidate memory from Postgres, compares it to the job description, and generates customized pitches, salary negotiations, attachments lists, and checklist prep plans.
     *   **Proposal Modal Dashboard**: Designed a modal window on `/jobs` rendering custom cover letters, rate strategies, and attachments with copy buttons.
 
+### Phase 8: Enterprise API Key Database Persistence (V9.0)
+*   **Objective**: Centralize configuration variables and sensitive API keys inside the Supabase database, securing client credentials, and enabling multi-device configuration synchronization.
+*   **Implementation**:
+    *   **Prisma User Settings Migration**: Added `apiKeys`, `selectedModels`, `activeProvider`, `aiRealism`, and `tavilyKey` directly to the `User` schema.
+    *   **Server Actions Integration**: Implemented server-side settings read/write operations mapping variables to the DB.
+    *   **Route Handler Settings Fallbacks**: Updated `/api/models`, `/api/jobs/search`, `/api/jobs/apply`, `/api/chat`, `/api/optimize`, `/api/challenge/generate`, `/api/challenge/evaluate`, and `/api/refine` to fallback dynamically to the database-backed configuration settings if request payloads are omitted or incomplete.
+    *   **CSS Variable Adjustments**: Cleaned up layout font overrides in `app/globals.css`.
+
 ---
 
 ## 3. Code Modifications & Repository Health

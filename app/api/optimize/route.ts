@@ -3,28 +3,60 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { getProvider } from '@/lib/llm-providers';
 import { generatePrompt } from '@/lib/utils';
-import { OptimizeRequest, OptimizeResponse } from '@/lib/types';
+import { OptimizeRequest, OptimizeResponse, Provider } from '@/lib/types';
 import { searchCareerChunks } from '@/lib/vector';
 import { defaultMemory } from '@/lib/memory';
+import { prisma } from '@/lib/prisma';
 
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session || !session.user) {
+    if (!session || !session.user || !session.user.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email }
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
     const body = await req.json() as OptimizeRequest;
     
-    const {
+    let {
       jobDescription,
       provider: providerName,
       model,
       userApiKey,
       memory,
       preferences = { tone: 'technical', length: 'standard', focus: 'skills' },
-      realism = 'brutal',
+      realism,
     } = body;
+
+    // Load configurations from Database settings if missing
+    let dbKeys: Record<string, string> = {};
+    let dbModels: Record<string, string> = {};
+    if (user.apiKeys) {
+      try { dbKeys = JSON.parse(user.apiKeys); } catch (e) {}
+    }
+    if (user.selectedModels) {
+      try { dbModels = JSON.parse(user.selectedModels); } catch (e) {}
+    }
+
+    if (!providerName) {
+      providerName = (user.activeProvider as Provider) || 'anthropic';
+    }
+    if (!model) {
+      model = dbModels[providerName] || '';
+    }
+    if (!userApiKey) {
+      userApiKey = dbKeys[providerName] || '';
+    }
+    if (!realism) {
+      realism = (user.aiRealism as 'supportive' | 'brutal') || 'brutal';
+    }
 
     if (!jobDescription) {
       return NextResponse.json({ error: 'Job description is required' }, { status: 400 });
