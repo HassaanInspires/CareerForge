@@ -16,7 +16,8 @@ import {
   loadUserHistory, 
   loadUserChatLog, 
   saveUserChatLog,
-  loadUserSettings
+  loadUserSettings,
+  deleteUserResume
 } from '@/app/actions/memory';
 import { useSession } from 'next-auth/react';
 
@@ -54,7 +55,7 @@ export default function ProfileHub() {
       const mem = await loadUserMemory();
       if (mem) {
         setMemory(mem);
-        setHasResume(mem.coreSkills.length > 0 || mem.proofOfWork.length > 0);
+        setHasResume(!!mem.resumeFileName);
       } else {
         setMemory(defaultMemory);
         setHasResume(false);
@@ -199,13 +200,49 @@ export default function ProfileHub() {
   };
 
   const resetProfile = async () => {
-    localStorage.removeItem(RESUME_STORAGE_KEY);
-    await saveUserMemory(defaultMemory);
-    const welcomeLog = [{ role: 'ai' as const, content: 'Hello! Please upload a new CV to begin.' }];
-    await saveUserChatLog(welcomeLog);
-    setHasResume(false);
-    setMemory(defaultMemory);
-    setChatLog(welcomeLog);
+    if (!confirm('Are you sure you want to delete your CV, memory profile, and optimization history? This action is permanent.')) return;
+    setIsUploading(true);
+    try {
+      await deleteUserResume();
+      localStorage.removeItem(RESUME_STORAGE_KEY);
+      const welcomeLog = [{ role: 'ai' as const, content: 'Hello! Please upload a new CV to begin.' }];
+      setHasResume(false);
+      setMemory(defaultMemory);
+      setChatLog(welcomeLog);
+      setHistory([]);
+      setError('');
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDownloadResume = () => {
+    if (!memory?.resumeBase64) {
+      alert("No active CV/Resume content found to download.");
+      return;
+    }
+    try {
+      const base64Content = memory.resumeBase64;
+      const binaryString = window.atob(base64Content);
+      const len = binaryString.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = memory.resumeFileName || 'resume.pdf';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert("Failed to download CV: " + err.message);
+    }
   };
 
   const handleConnectGithub = async (e: React.FormEvent) => {
@@ -285,6 +322,63 @@ export default function ProfileHub() {
             
             {/* Long-Term Memory Visualizer */}
             <div className="lg:col-span-2 space-y-6">
+              
+              {/* Active Master Resume Card */}
+              <div className="glass-card p-6 border-t-4 border-t-[var(--color-accent-blue)] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-xl">
+                    📄
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-white text-sm">Active Master Resume</h3>
+                    <p className="text-xs text-[var(--color-text-secondary)] font-mono">
+                      {memory.resumeFileName || 'resume.pdf'}
+                    </p>
+                    {memory.resumeUploadedAt && (
+                      <p className="text-[10px] text-[var(--color-text-disabled)] mt-0.5">
+                        Uploaded on {new Date(memory.resumeUploadedAt).toLocaleDateString(undefined, {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button 
+                    onClick={handleDownloadResume}
+                    className="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1.5 font-mono"
+                  >
+                    Download PDF
+                  </button>
+                  <button 
+                    onClick={() => document.getElementById('profile-cv-replace-upload')?.click()}
+                    className="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1.5 font-mono"
+                    disabled={isUploading}
+                  >
+                    Replace CV
+                  </button>
+                  <button 
+                    onClick={resetProfile}
+                    className="btn-secondary py-1.5 px-3 text-xs border-red-500/20 hover:border-red-500 hover:bg-red-500/10 text-red-400 flex items-center gap-1.5 font-mono"
+                    disabled={isUploading}
+                  >
+                    Delete
+                  </button>
+                  <input 
+                    type="file" 
+                    id="profile-cv-replace-upload"
+                    accept=".pdf" 
+                    onChange={handleFileUpload} 
+                    className="hidden"
+                    disabled={isUploading}
+                  />
+                </div>
+              </div>
+
               <div className="glass-card p-6 border-t-4 border-t-[var(--color-accent-blue)]">
                 <div className="flex justify-between items-start mb-6">
                   <div>

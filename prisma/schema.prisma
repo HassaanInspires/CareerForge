@@ -47,6 +47,10 @@ model CandidateMemory {
   identifiedGaps       String   @default("[]")
   dataSufficiencyScore Int      @default(0)
   
+  resumeFileName       String?
+  resumeBase64         String?
+  resumeUploadedAt     DateTime?
+  
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 }

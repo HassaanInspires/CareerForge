@@ -59,7 +59,10 @@ export async function loadUserMemory(): Promise<CandidateMemory | null> {
     identifiedGaps,
     dataSufficiencyScore: memory.dataSufficiencyScore || 0,
     proofOfWork: parsedPoW,
-    verifiedSkills: []
+    verifiedSkills: [],
+    resumeFileName: memory.resumeFileName,
+    resumeBase64: memory.resumeBase64,
+    resumeUploadedAt: memory.resumeUploadedAt ? memory.resumeUploadedAt.toISOString() : null
   };
 }
 
@@ -87,7 +90,10 @@ export async function saveUserMemory(memory: CandidateMemory) {
       coreSkills: JSON.stringify(memory.coreSkills || []),
       verifiableMetrics: JSON.stringify(memory.verifiableMetrics || []),
       identifiedGaps: JSON.stringify(memory.identifiedGaps || []),
-      dataSufficiencyScore: memory.dataSufficiencyScore || 0
+      dataSufficiencyScore: memory.dataSufficiencyScore || 0,
+      resumeFileName: memory.resumeFileName || null,
+      resumeBase64: memory.resumeBase64 || null,
+      resumeUploadedAt: memory.resumeUploadedAt ? new Date(memory.resumeUploadedAt) : null
     },
     update: {
       careerLevel: memory.careerLevel,
@@ -95,7 +101,10 @@ export async function saveUserMemory(memory: CandidateMemory) {
       coreSkills: JSON.stringify(memory.coreSkills || []),
       verifiableMetrics: JSON.stringify(memory.verifiableMetrics || []),
       identifiedGaps: JSON.stringify(memory.identifiedGaps || []),
-      dataSufficiencyScore: memory.dataSufficiencyScore || 0
+      dataSufficiencyScore: memory.dataSufficiencyScore || 0,
+      resumeFileName: memory.resumeFileName !== undefined ? memory.resumeFileName : undefined,
+      resumeBase64: memory.resumeBase64 !== undefined ? memory.resumeBase64 : undefined,
+      resumeUploadedAt: memory.resumeUploadedAt !== undefined ? (memory.resumeUploadedAt ? new Date(memory.resumeUploadedAt) : null) : undefined
     }
   });
 
@@ -265,6 +274,55 @@ export async function saveUserSettings(settings: {
       tavilyKey: settings.tavilyKey,
       duckduckgoKey: settings.duckduckgoKey
     }
+  });
+
+  return { success: true };
+}
+
+export async function deleteUserResume() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.email) {
+    throw new Error('Not authenticated');
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { email: session.user.email },
+    include: { memory: true }
+  });
+
+  if (!user) throw new Error('User not found');
+
+  if (user.memory) {
+    await prisma.candidateMemory.update({
+      where: { userId: user.id },
+      data: {
+        careerLevel: 'Entry Level',
+        careerGoals: '',
+        coreSkills: '[]',
+        verifiableMetrics: '[]',
+        identifiedGaps: '[]',
+        dataSufficiencyScore: 0,
+        resumeFileName: null,
+        resumeBase64: null,
+        resumeUploadedAt: null,
+        chatLog: '[]'
+      }
+    });
+  }
+
+  // Delete all ProofOfWork artifacts
+  await prisma.proofOfWork.deleteMany({
+    where: { userId: user.id }
+  });
+
+  // Delete all vector chunks
+  await prisma.careerChunk.deleteMany({
+    where: { userId: user.id }
+  });
+
+  // Delete all optimization history
+  await prisma.sessionHistory.deleteMany({
+    where: { userId: user.id }
   });
 
   return { success: true };

@@ -146,7 +146,10 @@ Return ONLY a valid JSON object matching this exact structure:
       careerLevel: newMemory.careerLevel || 'Entry Level',
       dataSufficiencyScore: 50, // Start at 50% for initial upload
       proofOfWork: [],
-      verifiedSkills: []
+      verifiedSkills: [],
+      resumeFileName: resumeFileName || 'resume.pdf',
+      resumeBase64: resumeBase64 || null,
+      resumeUploadedAt: new Date().toISOString()
     };
 
     return NextResponse.json({ memory });

@@ -22,6 +22,10 @@ export interface CandidateMemory {
   // V5.0 Pivot Additions
   proofOfWork: ProofOfWorkItem[];
   verifiedSkills: string[];
+
+  resumeFileName?: string | null;
+  resumeBase64?: string | null;
+  resumeUploadedAt?: string | null;
 }
 
 export const defaultMemory: CandidateMemory = {
@@ -32,7 +36,10 @@ export const defaultMemory: CandidateMemory = {
   careerLevel: 'Entry Level',
   dataSufficiencyScore: 0,
   proofOfWork: [],
-  verifiedSkills: []
+  verifiedSkills: [],
+  resumeFileName: null,
+  resumeBase64: null,
+  resumeUploadedAt: null
 };
 
 // V4.0 Local Storage Helpers
