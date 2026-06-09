@@ -31,6 +31,7 @@ model User {
   proofOfWork     ProofOfWork[]
   sessions        SessionHistory[]
   chunks          CareerChunk[]
+  savedJobs       SavedJob[]
 }
 
 model CandidateMemory {
@@ -97,4 +98,29 @@ model CareerChunk {
   embedding   Unsupported("vector(384)")
   
   createdAt   DateTime @default(now())
+}
+
+model SavedJob {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  title            String
+  company          String
+  url              String
+  location         String
+  salary           String?
+  description      String
+  isRemote         Boolean  @default(true)
+  fitScore         Int?
+  trustScore       Int?
+  trustExplanation String?
+  fitExplanation   String?
+  unfitExplanation String?
+  matchedSkills    String   @default("[]") // JSON string of skills
+  missingSkills    String   @default("[]") // JSON string of missing skills
+  remoteType       String   @default("Remote")
+  source           String   @default("duckduckgo") // "duckduckgo" | "tavily"
+  
+  savedAt          DateTime @default(now())
 }

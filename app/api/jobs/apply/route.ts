@@ -29,7 +29,8 @@ export async function POST(req: NextRequest) {
       salary,
       provider: providerName,
       model,
-      userApiKey
+      userApiKey,
+      interviewAnswers = []
     } = body;
 
     // Load configurations from Database settings if missing
@@ -68,6 +69,15 @@ export async function POST(req: NextRequest) {
 
     const powTitles = user.proofOfWork.map(p => `- ${p.title} (${p.type}): ${p.url}`).join('\n');
 
+    // Format the interview responses
+    let answersContext = '';
+    if (interviewAnswers && Array.isArray(interviewAnswers) && interviewAnswers.length > 0) {
+      answersContext = `\n--- CANDIDATE TARGETED INTERVIEW RESPONSES ---\n` + 
+        interviewAnswers.map((ans: any, idx: number) => 
+          `Q${idx + 1}: ${ans.question}\nResponse: ${ans.answer}`
+        ).join('\n\n') + '\n';
+    }
+
     const provider = getProvider(providerName);
     const prompt = `
 You are the AI Application Strategy & Cover Letter Generator for CareerForge.
@@ -82,7 +92,7 @@ ${verifiableMetrics.map(m => `- ${m}`).join('\n')}
 
 --- PROOF OF WORK ARTIFACTS IN PORTFOLIO ---
 ${powTitles || 'No artifacts registered.'}
-
+${answersContext}
 --- TARGET JOB DETAILS ---
 Title: ${title}
 Company: ${company}
@@ -91,7 +101,7 @@ URL: ${url}
 Description: ${description || 'Not specified'}
 
 Formulate:
-1. A tailored proposal / cover letter (max 350 words) that matches their metrics and proof-of-work to the job spec.
+1. A tailored proposal / cover letter (max 350 words) that matches their metrics, proof-of-work, and specific interview responses to the job spec. Integrate their interview answers naturally and make it sound realistic, not generated.
 2. A checklist of exactly what attachments to include (e.g. specific GitHub repos, certified CV).
 3. A customized salary justification strategy showing how to argue for maximum pay based on their metrics.
 4. A skills preparation list detailing exactly what topics from the job description they should study to succeed in the interview.

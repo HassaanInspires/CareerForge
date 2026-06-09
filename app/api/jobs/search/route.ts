@@ -12,6 +12,7 @@ interface JobSourceItem {
   salary: string;
   description: string;
   isRemote: boolean;
+  source: 'tavily' | 'duckduckgo';
 }
 
 // 1. DuckDuckGo Free Search Scraper (100% Free, No Key Required)
@@ -72,7 +73,8 @@ async function crawlDuckDuckGo(searchQuery: string): Promise<JobSourceItem[]> {
           location: isRemote ? 'Remote' : 'Worldwide',
           salary: 'Estimated based on spec',
           description: snippetText.substring(0, 1000),
-          isRemote
+          isRemote,
+          source: 'duckduckgo'
         });
       }
     }
@@ -128,7 +130,8 @@ async function crawlTavily(searchQuery: string, apiKey: string): Promise<JobSour
         location: isRemote ? 'Remote' : 'Hybrid/Worldwide',
         salary: 'Negotiable',
         description: r.content || '',
-        isRemote
+        isRemote,
+        source: 'tavily'
       };
     });
   } catch (error) {
@@ -161,8 +164,8 @@ export async function POST(req: NextRequest) {
       model, 
       userApiKey,
       tavilyApiKey = '',
-      duckduckgoKey = '',
-      depth = 'quick' // 'quick' (5 jobs) or 'deep' (15 jobs)
+      engineSource = 'mixed', // 'mixed' | 'tavily' | 'duckduckgo'
+      depth = 'quick' // 'quick' (6 jobs) or 'deep' (12 jobs)
     } = body;
 
     // Load settings from Database if missing
@@ -187,9 +190,6 @@ export async function POST(req: NextRequest) {
     if (!tavilyApiKey) {
       tavilyApiKey = user.tavilyKey || '';
     }
-    if (!duckduckgoKey) {
-      duckduckgoKey = user.duckduckgoKey || '';
-    }
 
     if (!providerName || !model) {
       return NextResponse.json({ error: 'LLM provider and model are required' }, { status: 400 });
@@ -204,36 +204,51 @@ export async function POST(req: NextRequest) {
     }
 
     let jobsList: JobSourceItem[] = [];
+    let searchWarning = '';
 
-    // Construct broad query parameters
-    const targetQuery = `${query} ${location || 'Remote'} Developer designer jobs project`;
+    const hasTavilyKey = tavilyApiKey && tavilyApiKey.trim().startsWith('tvly-');
+    
+    // Resolve search engine preference and fallbacks
+    let selectedEngine = engineSource;
+    if ((selectedEngine === 'tavily' || selectedEngine === 'mixed') && !hasTavilyKey) {
+      selectedEngine = 'duckduckgo';
+      searchWarning = 'Tavily API key is missing or invalid. Automatically falling back to DuckDuckGo Free Scraper.';
+    }
 
-    // 1. Fetch from Tavily if key exists, otherwise crawl DuckDuckGo
-    if (tavilyApiKey && tavilyApiKey.trim().startsWith('tvly-')) {
-      console.log("Using Tavily Search engine...");
-      // Search Upwork/Fiverr/Freelancer/LinkedIn and direct company ATS pages in parallel
+    if (selectedEngine === 'tavily') {
+      console.log("Crawling via Tavily only...");
       const searchQueries = [
         `site:upwork.com/jobs OR site:upwork.com/freelance-jobs "${query}"`,
         `site:linkedin.com/jobs/view OR site:linkedin.com/jobs "${query}" "${location}"`,
-        `site:freelancer.com/projects OR site:fiverr.com "${query}"`,
         `site:greenhouse.io OR site:lever.co OR site:*.jobs "${query}" "${location}"`,
-        `"${query}" career portal jobs OR hiring "${location}"`
       ];
-      
       const crawledArrays = await Promise.all(
         searchQueries.map(q => crawlTavily(q, tavilyApiKey))
       );
       crawledArrays.forEach(arr => jobsList.push(...arr));
-    } else {
-      console.log("Tavily key missing. Falling back to DuckDuckGo HTML Scraper + public APIs...");
-      // Fallback search Upwork & LinkedIn + Official Company Portals
+    } else if (selectedEngine === 'duckduckgo') {
+      console.log("Crawling via DuckDuckGo Free...");
       const ddgJobs = await crawlDuckDuckGo(`site:upwork.com/jobs OR site:linkedin.com/jobs "${query}" ${location}`);
       const ddgCompanyJobs = await crawlDuckDuckGo(`site:greenhouse.io OR site:lever.co OR site:*.jobs "${query}" ${location}`);
       const ddgDirectJobs = await crawlDuckDuckGo(`"${query}" career page OR hiring OR jobs "${location}"`);
-      
       jobsList.push(...ddgJobs, ...ddgCompanyJobs, ...ddgDirectJobs);
+    } else {
+      // Mixed - Parallel fetch from both
+      console.log("Crawling via Mixed Engines...");
+      const tavilyPromise = crawlTavily(`site:upwork.com/jobs "${query}" ${location}`, tavilyApiKey);
+      const ddgPromise = crawlDuckDuckGo(`site:linkedin.com/jobs "${query}" ${location}`);
+      const ddgCompanyPromise = crawlDuckDuckGo(`site:greenhouse.io OR site:lever.co OR site:*.jobs "${query}" ${location}`);
+      
+      const [tavilyJobs, ddgJobs, ddgCompanyJobs] = await Promise.all([
+        tavilyPromise,
+        ddgPromise,
+        ddgCompanyPromise
+      ]);
+      jobsList.push(...tavilyJobs, ...ddgJobs, ...ddgCompanyJobs);
+    }
 
-      // Add Remotive + Arbeitnow feeds
+    // Always fetch public Remotive & Arbeitnow feeds as extra sources in DuckDuckGo/Mixed searches
+    if (selectedEngine === 'duckduckgo' || selectedEngine === 'mixed') {
       try {
         const remotiveRes = await fetch('https://remotive.com/api/remote-jobs?limit=20');
         if (remotiveRes.ok) {
@@ -248,7 +263,8 @@ export async function POST(req: NextRequest) {
                   location: j.candidate_required_location || 'Remote',
                   salary: j.salary || 'Not specified',
                   description: (j.description || '').replace(/<[^>]*>/g, '').substring(0, 1000),
-                  isRemote: true
+                  isRemote: true,
+                  source: 'duckduckgo'
                 });
               }
             });
@@ -270,7 +286,8 @@ export async function POST(req: NextRequest) {
                   location: j.location || 'Europe',
                   salary: 'Negotiable',
                   description: (j.description || '').replace(/<[^>]*>/g, '').substring(0, 1000),
-                  isRemote: !!j.remote
+                  isRemote: !!j.remote,
+                  source: 'duckduckgo'
                 });
               }
             });
@@ -289,19 +306,18 @@ export async function POST(req: NextRequest) {
     });
 
     if (dedupedJobs.length === 0) {
-      return NextResponse.json({ jobs: [] });
+      return NextResponse.json({ jobs: [], warning: searchWarning });
     }
 
     // Slice based on search depth
     const maxItems = depth === 'deep' ? 12 : 6;
     const candidateJobs = dedupedJobs.slice(0, maxItems);
 
-    // 3. AI Authenticity, Match, Salary Verification Loop
+    // 3. AI Authenticity, Match, Salary & Fit Rationale Verification
     const provider = getProvider(providerName);
     const evaluationPrompt = `
 You are the AI Job Agent & Authenticity Validator of CareerForge.
-Your job is to evaluate a roster of job postings against a candidate's profile to score the fit and verify if the posting or company looks authentic (not spam/outdated).
-Verify the company details, trends, and calculate salary expectations.
+Your job is to evaluate a roster of job postings against a candidate's profile to score the fit, explain why they are a good match, and explain any mismatch.
 
 --- CANDIDATE INFORMATION ---
 Career Level: ${careerLevel}
@@ -320,9 +336,12 @@ Description: ${job.description.substring(0, 400)}...
 
 Evaluate each job. Determine:
 1. A Match Fit score (0-100) based on how well their skills match the requirements.
-2. A Company Authenticity Trust Score (0-100) explaining if the company looks legitimate, has active operations, or is a generic freelance middleman.
+2. A Company Authenticity Trust Score (0-100) explaining if the company looks legitimate.
 3. List matched skills and missing skills.
 4. Estimate realistic salary offerings based on market standards.
+5. Create:
+   - "fitExplanation": A 1-sentence explanation of why the user's skills are a great fit for this job.
+   - "unfitExplanation": A 1-sentence warning of what requirements they are missing or what gaps they might face.
 
 Return ONLY a valid JSON object matching this exact structure:
 {
@@ -332,8 +351,10 @@ Return ONLY a valid JSON object matching this exact structure:
       "fitScore": 85,
       "trustScore": 95,
       "trustExplanation": "Standard company with verifiable domain footprint.",
-      "matchedSkills": ["skill1"],
-      "missingSkills": ["skill2"],
+      "fitExplanation": "Your deep expertise in React and TypeScript aligns perfectly with the requirements of this front-end role.",
+      "unfitExplanation": "You are missing experience with Shopify or liquid templating required by their theme setup.",
+      "matchedSkills": ["React", "TypeScript"],
+      "missingSkills": ["Shopify"],
       "salaryEstimate": "$80k - $100k"
     }
   ]
@@ -352,6 +373,8 @@ Return ONLY a valid JSON object matching this exact structure:
         fitScore: 50,
         trustScore: 80,
         trustExplanation: "Standard web listings verification completed.",
+        fitExplanation: "Candidate holds general alignment with development criteria.",
+        unfitExplanation: "Make sure you check specific team frameworks not listed in memory.",
         matchedSkills: [],
         missingSkills: [],
         salaryEstimate: job.salary
@@ -362,13 +385,15 @@ Return ONLY a valid JSON object matching this exact structure:
         fitScore: evaluation.fitScore,
         trustScore: evaluation.trustScore,
         trustExplanation: evaluation.trustExplanation,
+        fitExplanation: evaluation.fitExplanation,
+        unfitExplanation: evaluation.unfitExplanation,
         matchedSkills: evaluation.matchedSkills,
         missingSkills: evaluation.missingSkills,
         salary: evaluation.salaryEstimate || job.salary
       };
     });
 
-    return NextResponse.json({ jobs: evaluatedList });
+    return NextResponse.json({ jobs: evaluatedList, warning: searchWarning });
 
   } catch (error: any) {
     console.error('Job Agent Search Error:', error);

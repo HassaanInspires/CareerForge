@@ -16,22 +16,55 @@ interface Job {
   fitScore: number;
   trustScore: number;
   trustExplanation: string;
+  fitExplanation?: string;
+  unfitExplanation?: string;
   matchedSkills: string[];
   missingSkills: string[];
   remoteType: string;
+  source?: string;
+}
+
+interface InterviewQuestion {
+  id: string;
+  type: 'mcq' | 'multi' | 'text';
+  question: string;
+  options?: string[];
 }
 
 export default function JobAgentPage() {
   const { data: session, status } = useSession();
+  
+  // Search parameters
   const [query, setQuery] = useState('');
   const [location, setLocation] = useState('Remote');
   const [depth, setDepth] = useState<'quick' | 'deep'>('quick');
+  const [engineSource, setEngineSource] = useState<'mixed' | 'tavily' | 'duckduckgo'>('mixed');
   const [jobs, setJobs] = useState<Job[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [searchWarning, setSearchWarning] = useState<string | null>(null);
   const [hasKeys, setHasKeys] = useState(true);
 
-  // Proposal Builder States
+  // Tabs
+  const [activeTab, setActiveTab] = useState<'search' | 'saved'>('search');
+  const [savedJobs, setSavedJobs] = useState<Job[]>([]);
+  const [isLoadingSaved, setIsLoadingSaved] = useState(false);
+
+  // Query Suggestion states
+  const [isSuggestingQuery, setIsSuggestingQuery] = useState(false);
+  const [suggestedRationale, setSuggestedRationale] = useState<string | null>(null);
+
+  // Interview Modal states
+  const [interviewJob, setInterviewJob] = useState<Job | null>(null);
+  const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false);
+  const [interviewQuestions, setInterviewQuestions] = useState<InterviewQuestion[]>([]);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [selectedMCQAnswer, setSelectedMCQAnswer] = useState<string>('');
+  const [selectedMultiAnswers, setSelectedMultiAnswers] = useState<string[]>([]);
+  const [shortTextAnswer, setShortTextAnswer] = useState<string>('');
+  const [finalAnswersList, setFinalAnswersList] = useState<{ question: string; answer: string }[]>([]);
+
+  // Cover Letter Proposal states
   const [proposalJob, setProposalJob] = useState<Job | null>(null);
   const [proposalData, setProposalData] = useState<{
     proposal: string;
@@ -52,7 +85,61 @@ export default function JobAgentPage() {
     const provider = localStorage.getItem('cf_provider') || 'anthropic';
     const apiKey = localStorage.getItem(`cf_key_${provider}`) || '';
     setHasKeys(!!apiKey);
+    fetchSavedJobs();
   }, []);
+
+  const fetchSavedJobs = async () => {
+    setIsLoadingSaved(true);
+    try {
+      const res = await fetch('/api/jobs/save');
+      if (res.ok) {
+        const data = await res.json();
+        setSavedJobs(data.jobs || []);
+      }
+    } catch (e) {
+      console.error('Failed to load saved jobs', e);
+    } finally {
+      setIsLoadingSaved(false);
+    }
+  };
+
+  const handleToggleBookmark = async (job: Job) => {
+    try {
+      const res = await fetch('/api/jobs/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(job)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        fetchSavedJobs();
+      }
+    } catch (e) {
+      console.error('Failed to toggle bookmark', e);
+    }
+  };
+
+  const handleSuggestQuery = async () => {
+    setIsSuggestingQuery(true);
+    setError(null);
+    setSuggestedRationale(null);
+    try {
+      const res = await fetch('/api/jobs/suggest-query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to suggest query');
+      
+      setQuery(data.query || '');
+      setLocation(data.location || 'Remote');
+      setSuggestedRationale(data.rationale || '');
+    } catch (err: any) {
+      setError(`AI Suggestion Error: ${err.message}`);
+    } finally {
+      setIsSuggestingQuery(false);
+    }
+  };
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,6 +150,7 @@ export default function JobAgentPage() {
 
     setIsLoading(true);
     setError(null);
+    setSearchWarning(null);
 
     const provider = localStorage.getItem('cf_provider') as Provider || 'anthropic';
     const apiKey = localStorage.getItem(`cf_key_${provider}`) || '';
@@ -77,6 +165,7 @@ export default function JobAgentPage() {
           query,
           location,
           depth,
+          engineSource,
           provider,
           model,
           userApiKey: apiKey,
@@ -88,6 +177,9 @@ export default function JobAgentPage() {
       if (!res.ok) throw new Error(data.error || 'Failed to search jobs');
 
       setJobs(data.jobs || []);
+      if (data.warning) {
+        setSearchWarning(data.warning);
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -95,7 +187,69 @@ export default function JobAgentPage() {
     }
   };
 
-  const handleGenerateProposal = async (job: Job) => {
+  const handleStartApplicationFlow = async (job: Job) => {
+    setInterviewJob(job);
+    setIsGeneratingQuestions(true);
+    setInterviewQuestions([]);
+    setCurrentQuestionIndex(0);
+    setSelectedMCQAnswer('');
+    setSelectedMultiAnswers([]);
+    setShortTextAnswer('');
+    setFinalAnswersList([]);
+
+    try {
+      const res = await fetch('/api/jobs/interview-questions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: job.title,
+          company: job.company,
+          description: job.description
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to load questions');
+      setInterviewQuestions(data.questions || []);
+    } catch (err: any) {
+      // Fallback if AI question compilation fails: skip directly to generating cover letter
+      console.warn("Interview prep compilation failed. Falling back to direct generation.", err);
+      setInterviewJob(null);
+      handleGenerateProposal(job, []);
+    } finally {
+      setIsGeneratingQuestions(false);
+    }
+  };
+
+  const handleNextQuestion = () => {
+    const currentQ = interviewQuestions[currentQuestionIndex];
+    let answer = '';
+
+    if (currentQ.type === 'mcq') {
+      answer = selectedMCQAnswer || 'No preference';
+    } else if (currentQ.type === 'multi') {
+      answer = selectedMultiAnswers.length > 0 ? selectedMultiAnswers.join(', ') : 'None selected';
+    } else {
+      answer = shortTextAnswer || 'No specific past project to declare';
+    }
+
+    const newAnswers = [...finalAnswersList, { question: currentQ.question, answer }];
+    setFinalAnswersList(newAnswers);
+
+    if (currentQuestionIndex < interviewQuestions.length - 1) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
+      // Reset inputs for next question
+      setSelectedMCQAnswer('');
+      setSelectedMultiAnswers([]);
+      setShortTextAnswer('');
+    } else {
+      // Finished all questions! Trigger Cover letter generator with answer context
+      const targetJob = interviewJob!;
+      setInterviewJob(null);
+      handleGenerateProposal(targetJob, newAnswers);
+    }
+  };
+
+  const handleGenerateProposal = async (job: Job, answers: { question: string; answer: string }[]) => {
     setProposalJob(job);
     setIsGeneratingProposal(true);
     setProposalError(null);
@@ -117,7 +271,8 @@ export default function JobAgentPage() {
           salary: job.salary,
           provider,
           model,
-          userApiKey: apiKey
+          userApiKey: apiKey,
+          interviewAnswers: answers
         })
       });
 
@@ -137,189 +292,427 @@ export default function JobAgentPage() {
     return 'text-[var(--color-error)] border-[var(--color-error)]';
   };
 
+  const isJobBookmarked = (jobUrl: string) => {
+    return savedJobs.some(sj => sj.url === jobUrl);
+  };
+
+  const renderJobCard = (job: Job, idx: number) => {
+    const bookmarked = isJobBookmarked(job.url);
+    return (
+      <div key={idx} className="glass-card p-6 flex flex-col justify-between border-l-4 border-l-[var(--color-accent-blue)] hover:border-l-[var(--color-accent-purple)] transition-all">
+        <div>
+          <div className="flex justify-between items-start mb-3">
+            <div>
+              <div className="flex items-center gap-2 mb-0.5">
+                <h4 className="text-lg font-bold text-white leading-snug">{job.title}</h4>
+                <button
+                  onClick={() => handleToggleBookmark(job)}
+                  className="text-lg hover:scale-125 transition-transform focus:outline-none"
+                  title={bookmarked ? "Unbookmark job" : "Bookmark job"}
+                >
+                  {bookmarked ? '⭐' : '☆'}
+                </button>
+              </div>
+              <p className="text-sm text-[var(--color-text-secondary)]">{job.company}</p>
+            </div>
+            <div className="flex flex-col items-end gap-1.5">
+              <div className="flex gap-2">
+                <span className="text-[10px] px-2 py-0.5 rounded bg-[var(--color-bg-secondary)] border border-[var(--color-border-light)] text-[var(--color-text-secondary)]">
+                  {job.remoteType}
+                </span>
+                <span className="text-[10px] px-2 py-0.5 rounded bg-[var(--color-bg-secondary)] border border-[var(--color-border-light)] text-[var(--color-text-secondary)]">
+                  {job.location}
+                </span>
+              </div>
+              <span className="text-[9px] uppercase font-mono tracking-wider px-1.5 py-0.5 rounded bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)] text-[var(--color-text-disabled)]">
+                {job.source === 'tavily' ? '🚀 via Tavily' : '🔍 via DuckDuckGo'}
+              </span>
+            </div>
+          </div>
+
+          {/* Scores Section */}
+          <div className="grid grid-cols-2 gap-4 my-4 p-3 rounded bg-[rgba(255,255,255,0.02)] border border-[var(--color-border-light)]">
+            <div className="text-center border-r border-[var(--color-border-light)]">
+              <span className="block text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] mb-1">Match Fit</span>
+              <span className={`text-xl font-bold px-2 py-0.5 rounded border ${getScoreColor(job.fitScore)}`}>
+                {job.fitScore}%
+              </span>
+            </div>
+            <div className="text-center">
+              <span className="block text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] mb-1">Company Trust</span>
+              <span className={`text-xl font-bold px-2 py-0.5 rounded border ${getScoreColor(job.trustScore)}`}>
+                {job.trustScore}%
+              </span>
+            </div>
+          </div>
+
+          {/* Fit Rationale Section */}
+          <div className="space-y-2 mb-4">
+            {job.fitExplanation && (
+              <div className="text-xs p-2.5 rounded bg-[rgba(34,197,94,0.03)] border border-[rgba(34,197,94,0.12)] text-[var(--color-success)]">
+                <strong>✔ Fit Analysis:</strong> {job.fitExplanation}
+              </div>
+            )}
+            {job.unfitExplanation && (
+              <div className="text-xs p-2.5 rounded bg-[rgba(239,68,68,0.03)] border border-[rgba(239,68,68,0.12)] text-[var(--color-accent-orange)]">
+                <strong>⚠ Caution Points:</strong> {job.unfitExplanation}
+              </div>
+            )}
+          </div>
+
+          {/* Description Snippet */}
+          <p className="text-xs text-[var(--color-text-secondary)] line-clamp-3 mb-4 leading-relaxed">
+            {job.description}
+          </p>
+
+          {/* Trust Explanation */}
+          <div className="text-xs p-2.5 rounded bg-[rgba(235,166,90,0.03)] border border-[rgba(235,166,90,0.12)] text-[var(--color-text-secondary)] mb-4">
+            <strong>AI Trust Audit:</strong> {job.trustExplanation}
+          </div>
+
+          {/* Skills alignment */}
+          <div className="space-y-2 mb-6">
+            {job.matchedSkills && job.matchedSkills.length > 0 && (
+              <div>
+                <span className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] block mb-1">Matched Skills</span>
+                <div className="flex flex-wrap gap-1">
+                  {job.matchedSkills.map((s, i) => (
+                    <span key={i} className="text-[10px] px-2 py-0.5 rounded bg-[rgba(34,197,94,0.1)] text-[var(--color-success)] border border-[rgba(34,197,94,0.2)]">
+                      {s}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {job.missingSkills && job.missingSkills.length > 0 && (
+              <div>
+                <span className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] block mb-1">Missing Requirements</span>
+                <div className="flex flex-wrap gap-1">
+                  {job.missingSkills.map((s, i) => (
+                    <span key={i} className="text-[10px] px-2 py-0.5 rounded bg-[rgba(239,68,68,0.1)] text-[var(--color-error)] border border-[rgba(239,68,68,0.2)]">
+                      {s}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <div className="flex flex-col gap-2 pt-4 border-t border-[var(--color-border-light)]">
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-mono text-[var(--color-text-disabled)]">Offer: {job.salary}</span>
+              <a
+                href={job.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-[var(--color-accent-blue)] underline hover:text-white"
+              >
+                View Official Link ↗
+              </a>
+            </div>
+            <button
+              onClick={() => handleStartApplicationFlow(job)}
+              className="btn-primary py-2 px-4 text-xs font-bold bg-gradient-to-r from-[var(--color-accent-blue)] to-[var(--color-accent-purple)] text-white hover:opacity-90 flex items-center justify-center gap-1 mt-2"
+            >
+              Generate Pitch & Proposal Strategy ⚡
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="w-full max-w-6xl mx-auto p-6 md:p-12 font-sans text-white">
 
       <main className="max-w-6xl mx-auto space-y-8 animate-fade-in">
-        {/* Search Parameter Dashboard */}
-        <div className="glass-card p-6 border-t-4 border-t-[var(--color-accent-purple)]">
-          <h2 className="text-lg font-bold text-white mb-2">Configure Job Hunt Crawler</h2>
-          <p className="text-sm text-[var(--color-text-secondary)] mb-6">
-            The AI Agent aggregates remote and European hybrid listings, queries live feeds, and tests company authenticity and skills compatibility against your profile memory in real time.
-          </p>
 
-          {!hasKeys && (
-            <div className="mb-6 p-4 rounded bg-[rgba(239,68,68,0.1)] border border-[var(--color-error)] text-[var(--color-error)] text-sm">
-              ⚠️ <strong>Action Required:</strong> You must configure your AI keys in <Link href="/settings" className="underline font-bold hover:text-white">Settings</Link> first. Search engines and match rankings cannot run without an active provider.
-            </div>
-          )}
-
-          <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-2">Job Title / Keywords</label>
-              <input
-                type="text"
-                placeholder="e.g. Next.js, Developer"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                className="input-field w-full text-sm py-2"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-2">Location Preferential</label>
-              <input
-                type="text"
-                placeholder="e.g. Remote, Europe"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                className="input-field w-full text-sm py-2"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-2">Search Depth</label>
-              <select
-                value={depth}
-                onChange={(e) => setDepth(e.target.value as any)}
-                className="input-field w-full text-sm py-2"
-              >
-                <option value="quick">Quick Match (6 listings)</option>
-                <option value="deep">Deep Agentic Scan (12 listings)</option>
-              </select>
-            </div>
-            <div className="flex items-end">
-              <button
-                type="submit"
-                disabled={isLoading || !hasKeys}
-                className="btn-primary w-full py-2.5 font-bold text-sm tracking-wide bg-gradient-to-r from-[var(--color-accent-blue)] to-[var(--color-accent-purple)] hover:opacity-90"
-              >
-                {isLoading ? 'Crawling & Rating...' : 'Execute Agent Search'}
-              </button>
-            </div>
-          </form>
-          {error && <p className="text-[var(--color-error)] mt-4 text-sm">{error}</p>}
+        {/* Tab Selection */}
+        <div className="flex border-b border-[var(--color-border-light)] gap-6">
+          <button
+            onClick={() => setActiveTab('search')}
+            className={`pb-3 text-sm font-bold uppercase tracking-wider transition-colors relative ${activeTab === 'search' ? 'text-white border-b-2 border-[var(--color-accent-purple)]' : 'text-[var(--color-text-secondary)] hover:text-white'}`}
+          >
+            🕵️ Job Hunt Agent
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab('saved');
+              fetchSavedJobs();
+            }}
+            className={`pb-3 text-sm font-bold uppercase tracking-wider transition-colors relative ${activeTab === 'saved' ? 'text-white border-b-2 border-[var(--color-accent-purple)]' : 'text-[var(--color-text-secondary)] hover:text-white'}`}
+          >
+            ⭐ Starred Openings ({savedJobs.length})
+          </button>
         </div>
 
-        {/* Results Stream */}
-        {isLoading ? (
-          <div className="text-center py-20 space-y-4">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--color-accent-purple)] mx-auto"></div>
-            <p className="text-sm text-[var(--color-text-secondary)]">
-              Contacting public feeds, parsing descriptions, checking company trust levels and matching your skills graph...
-            </p>
-          </div>
-        ) : jobs.length > 0 ? (
-          <div className="space-y-6">
-            <h3 className="text-xl font-bold text-white">Active Verified Openings</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {jobs.map((job, idx) => (
-                <div key={idx} className="glass-card p-6 flex flex-col justify-between border-l-4 border-l-[var(--color-accent-blue)] hover:border-l-[var(--color-accent-purple)] transition-all">
-                  <div>
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <h4 className="text-lg font-bold text-white mb-0.5">{job.title}</h4>
-                        <p className="text-sm text-[var(--color-text-secondary)]">{job.company}</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <span className="text-xs px-2 py-0.5 rounded bg-[var(--color-bg-secondary)] border border-[var(--color-border-light)] text-[var(--color-text-secondary)]">
-                          {job.remoteType}
-                        </span>
-                        <span className="text-xs px-2 py-0.5 rounded bg-[var(--color-bg-secondary)] border border-[var(--color-border-light)] text-[var(--color-text-secondary)]">
-                          {job.location}
-                        </span>
-                      </div>
-                    </div>
+        {activeTab === 'search' ? (
+          <>
+            {/* Search Parameter Dashboard */}
+            <div className="glass-card p-6 border-t-4 border-t-[var(--color-accent-purple)]">
+              <div className="flex justify-between items-start mb-2">
+                <h2 className="text-lg font-bold text-white">Configure Job Hunt Crawler</h2>
+                <button
+                  type="button"
+                  onClick={handleSuggestQuery}
+                  disabled={isSuggestingQuery}
+                  className="text-xs px-3 py-1.5 rounded bg-[rgba(147,51,234,0.15)] border border-[rgba(147,51,234,0.3)] text-[var(--color-accent-purple)] font-bold hover:bg-[rgba(147,51,234,0.25)] transition-colors"
+                >
+                  {isSuggestingQuery ? 'AI Suggesting...' : '✨ Suggest Query via AI'}
+                </button>
+              </div>
+              <p className="text-sm text-[var(--color-text-secondary)] mb-6">
+                The AI Agent aggregates remote hybrid listings, queries live web indexes (Tavily/DuckDuckGo), and tests skills compatibility against your CV.
+              </p>
 
-                    {/* Scores Section */}
-                    <div className="grid grid-cols-2 gap-4 my-4 p-3 rounded bg-[rgba(255,255,255,0.02)] border border-[var(--color-border-light)]">
-                      <div className="text-center border-r border-[var(--color-border-light)]">
-                        <span className="block text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] mb-1">Match Fit</span>
-                        <span className={`text-xl font-bold px-2 py-0.5 rounded border ${getScoreColor(job.fitScore)}`}>
-                          {job.fitScore}%
-                        </span>
-                      </div>
-                      <div className="text-center">
-                        <span className="block text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] mb-1">Company Trust</span>
-                        <span className={`text-xl font-bold px-2 py-0.5 rounded border ${getScoreColor(job.trustScore)}`}>
-                          {job.trustScore}%
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Description Snippet */}
-                    <p className="text-xs text-[var(--color-text-secondary)] line-clamp-3 mb-4">
-                      {job.description}
-                    </p>
-
-                    {/* Trust Explanation */}
-                    <div className="text-xs p-2.5 rounded bg-[rgba(235,166,90,0.05)] border border-[rgba(235,166,90,0.15)] text-[var(--color-accent-orange)] mb-4">
-                      <strong>AI Trust Audit:</strong> {job.trustExplanation}
-                    </div>
-
-                    {/* Skills alignment */}
-                    <div className="space-y-2 mb-6">
-                      {job.matchedSkills.length > 0 && (
-                        <div>
-                          <span className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] block mb-1">Matched Skills</span>
-                          <div className="flex flex-wrap gap-1">
-                            {job.matchedSkills.map((s, i) => (
-                              <span key={i} className="text-[10px] px-2 py-0.5 rounded bg-[rgba(34,197,94,0.1)] text-[var(--color-success)] border border-[rgba(34,197,94,0.2)]">
-                                {s}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {job.missingSkills.length > 0 && (
-                        <div>
-                          <span className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] block mb-1">Missing Requirements</span>
-                          <div className="flex flex-wrap gap-1">
-                            {job.missingSkills.map((s, i) => (
-                              <span key={i} className="text-[10px] px-2 py-0.5 rounded bg-[rgba(239,68,68,0.1)] text-[var(--color-error)] border border-[rgba(239,68,68,0.2)]">
-                                {s}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex flex-col gap-2 pt-4 border-t border-[var(--color-border-light)]">
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs font-mono text-[var(--color-text-disabled)]">Offer: {job.salary}</span>
-                        <a
-                          href={job.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-[var(--color-accent-blue)] underline hover:text-white"
-                        >
-                          View Official Link ↗
-                        </a>
-                      </div>
-                      <button
-                        onClick={() => handleGenerateProposal(job)}
-                        className="btn-primary py-2 px-4 text-xs font-bold bg-gradient-to-r from-[var(--color-accent-blue)] to-[var(--color-accent-purple)] text-white hover:opacity-90 flex items-center justify-center gap-1 mt-2"
-                      >
-                        Generate Pitch & Proposal Strategy ⚡
-                      </button>
-                    </div>
-                  </div>
+              {suggestedRationale && (
+                <div className="mb-6 p-4 rounded bg-[rgba(147,51,234,0.05)] border border-[rgba(147,51,234,0.15)] text-xs text-[var(--color-text-secondary)] animate-fade-in">
+                  <strong className="text-[var(--color-accent-purple)] block mb-1">🤖 AI Query Rationale:</strong>
+                  {suggestedRationale}
                 </div>
-              ))}
+              )}
+
+              {!hasKeys && (
+                <div className="mb-6 p-4 rounded bg-[rgba(239,68,68,0.1)] border border-[var(--color-error)] text-[var(--color-error)] text-sm">
+                  ⚠️ <strong>Action Required:</strong> You must configure your AI keys in <Link href="/settings" className="underline font-bold hover:text-white">Settings</Link> first. Search engines and match rankings cannot run without an active provider.
+                </div>
+              )}
+
+              {searchWarning && (
+                <div className="mb-6 p-4 rounded bg-[rgba(245,158,11,0.1)] border border-[var(--color-accent-orange)] text-[var(--color-accent-orange)] text-sm">
+                  ⚠️ <strong>Search Alert:</strong> {searchWarning}
+                </div>
+              )}
+
+              <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-2">Job Title / Keywords</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Next.js, Developer"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    className="input-field w-full text-sm py-2"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-2">Location Preferential</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Remote, Europe"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    className="input-field w-full text-sm py-2"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-2">Search Engine</label>
+                  <select
+                    value={engineSource}
+                    onChange={(e) => setEngineSource(e.target.value as any)}
+                    className="input-field w-full text-sm py-2"
+                  >
+                    <option value="mixed">Mixed Engines (Tavily + DDG)</option>
+                    <option value="duckduckgo">DuckDuckGo Scraper (Free)</option>
+                    <option value="tavily">Tavily Engine (Premium)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--color-text-secondary)] mb-2">Depth</label>
+                  <select
+                    value={depth}
+                    onChange={(e) => setDepth(e.target.value as any)}
+                    className="input-field w-full text-sm py-2"
+                  >
+                    <option value="quick">Quick (6 jobs)</option>
+                    <option value="deep">Deep Scan (12 jobs)</option>
+                  </select>
+                </div>
+                <div className="md:col-span-5 flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={isLoading || !hasKeys}
+                    className="btn-primary w-full md:w-auto px-8 py-2.5 font-bold text-sm tracking-wide bg-gradient-to-r from-[var(--color-accent-blue)] to-[var(--color-accent-purple)] hover:opacity-90"
+                  >
+                    {isLoading ? 'Crawling & Rating...' : 'Execute Agent Search'}
+                  </button>
+                </div>
+              </form>
+              {error && <p className="text-[var(--color-error)] mt-4 text-sm">{error}</p>}
             </div>
-          </div>
+
+            {/* Results Stream */}
+            {isLoading ? (
+              <div className="text-center py-20 space-y-4">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--color-accent-purple)] mx-auto"></div>
+                <p className="text-sm text-[var(--color-text-secondary)]">
+                  Contacting web indexes, parsing postings, auditing authenticity, and rating matched competencies...
+                </p>
+              </div>
+            ) : jobs.length > 0 ? (
+              <div className="space-y-6">
+                <h3 className="text-xl font-bold text-white">Active Verified Openings</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {jobs.map((job, idx) => renderJobCard(job, idx))}
+                </div>
+              </div>
+            ) : (
+              <div className="glass-card p-12 text-center text-[var(--color-text-secondary)]">
+                <p className="italic">No active search indexes loaded. Configure search keywords above to execute agent scan.</p>
+              </div>
+            )}
+          </>
         ) : (
-          <div className="glass-card p-12 text-center text-[var(--color-text-secondary)]">
-            <p className="italic">No crawlers running. Enter a search query above and execute search.</p>
+          /* Starred/Saved Openings tab */
+          <div>
+            {isLoadingSaved ? (
+              <div className="text-center py-20">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--color-accent-purple)] mx-auto"></div>
+              </div>
+            ) : savedJobs.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {savedJobs.map((job, idx) => renderJobCard(job, idx))}
+              </div>
+            ) : (
+              <div className="glass-card p-12 text-center text-[var(--color-text-secondary)]">
+                <p className="italic">You haven't bookmarked any jobs yet. Star jobs in search results to view them here.</p>
+              </div>
+            )}
           </div>
         )}
       </main>
 
+      {/* Interactive Clarification Interview Modal */}
+      {interviewJob && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="glass-card max-w-xl w-full p-8 space-y-6 border border-[var(--color-border-medium)] animate-scale-up">
+            <div className="flex justify-between items-start">
+              <div>
+                <h3 className="text-lg font-bold text-white">
+                  ⚡ Refining Application Strategy
+                </h3>
+                <p className="text-xs text-[var(--color-text-secondary)] mt-1">
+                  Answer 3 quick questions to help AI write a hyper-personalized cover letter for {interviewJob.title} at {interviewJob.company}.
+                </p>
+              </div>
+              <button
+                onClick={() => setInterviewJob(null)}
+                className="text-2xl text-[var(--color-text-disabled)] hover:text-white"
+              >
+                &times;
+              </button>
+            </div>
+
+            {isGeneratingQuestions ? (
+              <div className="text-center py-12 space-y-4">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--color-accent-purple)] mx-auto"></div>
+                <p className="text-xs text-[var(--color-text-secondary)]">
+                  Generating custom interview questions matching this job's profile...
+                </p>
+              </div>
+            ) : interviewQuestions.length > 0 ? (
+              <div className="space-y-6">
+                {/* Progress bar */}
+                <div className="w-full bg-[rgba(255,255,255,0.05)] rounded-full h-1.5">
+                  <div 
+                    className="bg-gradient-to-r from-[var(--color-accent-blue)] to-[var(--color-accent-purple)] h-1.5 rounded-full transition-all duration-300"
+                    style={{ width: `${((currentQuestionIndex + 1) / interviewQuestions.length) * 100}%` }}
+                  ></div>
+                </div>
+
+                <div className="space-y-2">
+                  <span className="text-[10px] uppercase font-mono tracking-wider text-[var(--color-accent-purple)] font-bold">
+                    Question {currentQuestionIndex + 1} of {interviewQuestions.length}
+                  </span>
+                  <p className="text-sm font-semibold text-white">
+                    {interviewQuestions[currentQuestionIndex].question}
+                  </p>
+                </div>
+
+                {/* Question Inputs */}
+                <div className="p-4 rounded bg-[rgba(255,255,255,0.02)] border border-[var(--color-border-light)]">
+                  {interviewQuestions[currentQuestionIndex].type === 'mcq' && (
+                    <div className="space-y-3">
+                      {interviewQuestions[currentQuestionIndex].options?.map((opt, i) => (
+                        <label key={i} className="flex items-center gap-3 text-xs text-[var(--color-text-secondary)] hover:text-white cursor-pointer p-2 rounded hover:bg-[rgba(255,255,255,0.02)] transition-colors">
+                          <input
+                            type="radio"
+                            name="mcq"
+                            value={opt}
+                            checked={selectedMCQAnswer === opt}
+                            onChange={(e) => setSelectedMCQAnswer(e.target.value)}
+                            className="text-[var(--color-accent-purple)] focus:ring-[var(--color-accent-purple)] bg-[var(--color-bg-secondary)]"
+                          />
+                          <span>{opt}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+
+                  {interviewQuestions[currentQuestionIndex].type === 'multi' && (
+                    <div className="space-y-3">
+                      {interviewQuestions[currentQuestionIndex].options?.map((opt, i) => {
+                        const checked = selectedMultiAnswers.includes(opt);
+                        return (
+                          <label key={i} className="flex items-center gap-3 text-xs text-[var(--color-text-secondary)] hover:text-white cursor-pointer p-2 rounded hover:bg-[rgba(255,255,255,0.02)] transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => {
+                                if (checked) {
+                                  setSelectedMultiAnswers(selectedMultiAnswers.filter(x => x !== opt));
+                                } else {
+                                  setSelectedMultiAnswers([...selectedMultiAnswers, opt]);
+                                }
+                              }}
+                              className="rounded text-[var(--color-accent-purple)] focus:ring-[var(--color-accent-purple)] bg-[var(--color-bg-secondary)]"
+                            />
+                            <span>{opt}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {interviewQuestions[currentQuestionIndex].type === 'text' && (
+                    <div>
+                      <input
+                        type="text"
+                        placeholder="Type your brief answer here..."
+                        value={shortTextAnswer}
+                        onChange={(e) => setShortTextAnswer(e.target.value)}
+                        className="input-field w-full text-xs py-2 px-3"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-between items-center pt-2">
+                  <button
+                    onClick={() => setInterviewJob(null)}
+                    className="text-xs text-[var(--color-text-disabled)] hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleNextQuestion}
+                    className="btn-primary py-2 px-6 text-xs bg-gradient-to-r from-[var(--color-accent-blue)] to-[var(--color-accent-purple)] font-bold"
+                  >
+                    {currentQuestionIndex === interviewQuestions.length - 1 ? 'Finish & Generate Pitch ⚡' : 'Next Question →'}
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
+
       {/* Proposal Generator Modal */}
       {proposalJob && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto animate-scale-up">
           <div className="glass-card max-w-3xl w-full p-8 space-y-6 max-h-[90vh] overflow-y-auto border border-[var(--color-border-medium)]">
             <div className="flex justify-between items-start">
               <div>
