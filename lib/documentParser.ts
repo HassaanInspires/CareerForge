@@ -24,12 +24,6 @@ export async function extractTextFromPDF(file: Buffer | Uint8Array): Promise<str
   }
 
   try {
-    // Robust worker setup for Node.js
-    if (typeof window === 'undefined') {
-      const workerPath = path.join(process.cwd(), 'node_modules', 'pdfjs-dist', 'legacy', 'build', 'pdf.worker.mjs');
-      // @ts-ignore
-      pdfjs.GlobalWorkerOptions.workerSrc = workerPath;
-    }
 
     const loadingTask = pdfjs.getDocument({
       data: file,

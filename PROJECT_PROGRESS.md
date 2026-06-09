@@ -120,6 +120,11 @@ Started with:
     *   **Success Banners**: Added a dismissible green light success message.
     *   **Clarification Modal**: Built an interactive modal that intercepts the user upon extraction completion, feeding custom choices ("Yes, let's refine my profile") directly into the Memory Manager chat.
 
+### Phase 14: Resolve Vercel Serverless PDF.js Worker Crash (V14.0)
+*   **Objective**: Fix the `Unexpected token '<', \"<!DOCTYPE \"...` JSON parsing error on Vercel caused by the PDF parsing worker path crash.
+*   **Implementation**:
+    *   **Worker Decoupling**: Removed the absolute `path.join(process.cwd(), 'node_modules', ...)` configuration in `lib/documentParser.ts`. Allowing Node.js to use the default built-in fake worker execution thread prevents dynamic file-tracing crashes in serverless runtimes.
+
 ---
 
 ## 3. Code Modifications & Repository Health
@@ -199,3 +204,4 @@ Started with:
 ✅ Visible extraction error banner reporting
 ✅ Green light extraction success banner
 ✅ Interactive Post-Extraction Clarification Modal
+✅ Bypassed Vercel Serverless Function filesystem worker path dependency to resolve runtime HTML error crashes
