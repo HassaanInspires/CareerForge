@@ -15,7 +15,8 @@ import {
   saveUserMemory, 
   loadUserHistory, 
   loadUserChatLog, 
-  saveUserChatLog 
+  saveUserChatLog,
+  loadUserSettings
 } from '@/app/actions/memory';
 import { useSession } from 'next-auth/react';
 
@@ -68,15 +69,23 @@ export default function ProfileHub() {
       if (dbHistory) {
         setHistory(dbHistory);
       }
+
+      // Load keys state from DB settings
+      const settings = await loadUserSettings();
+      if (settings) {
+        const provider = settings.activeProvider;
+        const apiKey = settings.apiKeys[provider] || '';
+        setHasKeys(!!apiKey);
+        setRealism((settings.aiRealism as 'supportive' | 'brutal') || 'brutal');
+      } else {
+        const provider = localStorage.getItem('cf_provider') || 'anthropic';
+        const apiKey = localStorage.getItem(`cf_key_${provider}`) || '';
+        setHasKeys(!!apiKey);
+        const savedRealism = localStorage.getItem('cf_ai_realism') as 'supportive' | 'brutal';
+        if (savedRealism) setRealism(savedRealism);
+      }
     };
     initProfile();
-
-    const provider = localStorage.getItem('cf_provider') || 'anthropic';
-    const apiKey = localStorage.getItem(`cf_key_${provider}`) || '';
-    setHasKeys(!!apiKey);
-
-    const savedRealism = localStorage.getItem('cf_ai_realism') as 'supportive' | 'brutal';
-    if (savedRealism) setRealism(savedRealism);
   }, [status]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {

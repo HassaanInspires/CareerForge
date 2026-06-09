@@ -13,6 +13,7 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [realism, setRealism] = useState('brutal');
   const [tavilyKey, setTavilyKey] = useState('');
+  const [duckduckgoKey, setDuckduckgoKey] = useState('');
 
   const providers = [
     { id: 'anthropic', name: 'Anthropic' },
@@ -30,6 +31,7 @@ export default function SettingsPage() {
           setActiveProvider(dbSettings.activeProvider);
           setRealism(dbSettings.aiRealism);
           setTavilyKey(dbSettings.tavilyKey);
+          setDuckduckgoKey(dbSettings.duckduckgoKey || '');
           setKeys(dbSettings.apiKeys || {});
           setSelectedModels(dbSettings.selectedModels || {});
 
@@ -49,6 +51,9 @@ export default function SettingsPage() {
 
           const savedTavily = localStorage.getItem('cf_tavily_key') || '';
           setTavilyKey(savedTavily);
+
+          const savedDDG = localStorage.getItem('cf_duckduckgo_key') || '';
+          setDuckduckgoKey(savedDDG);
 
           const loadedKeys: { [key: string]: string } = {};
           const loadedModels: { [key: string]: string } = {};
@@ -120,13 +125,15 @@ export default function SettingsPage() {
         selectedModels,
         activeProvider,
         aiRealism: realism,
-        tavilyKey
+        tavilyKey,
+        duckduckgoKey
       });
 
       // Local storage sync for backup / offline support
       localStorage.setItem('cf_provider', activeProvider);
       localStorage.setItem('cf_ai_realism', realism);
       localStorage.setItem('cf_tavily_key', tavilyKey);
+      localStorage.setItem('cf_duckduckgo_key', duckduckgoKey);
       Object.entries(keys).forEach(([provider, key]) => {
         localStorage.setItem(`cf_key_${provider}`, key);
       });
@@ -264,22 +271,43 @@ export default function SettingsPage() {
             Input search API keys to crawl Freelancer platforms (Upwork, Fiverr, Freelancer), LinkedIn, and official company job pages.
           </p>
 
-          <div className="flex flex-col sm:flex-row sm:items-start gap-4 p-4 rounded-xl border border-[var(--color-border-light)] bg-[rgba(255,255,255,0.02)]">
-            <div className="sm:w-1/4 pt-2">
-              <label className="font-medium text-[var(--color-text-secondary)]">Tavily API Key</label>
-              <span className="block text-[10px] text-[var(--color-text-disabled)] mt-1">Get free key at <a href="https://tavily.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-white">tavily.com</a></span>
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-start gap-4 p-4 rounded-xl border border-[var(--color-border-light)] bg-[rgba(255,255,255,0.02)]">
+              <div className="sm:w-1/4 pt-2">
+                <label className="font-medium text-[var(--color-text-secondary)]">Tavily API Key</label>
+                <span className="block text-[10px] text-[var(--color-text-disabled)] mt-1">Get free key at <a href="https://tavily.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-white">tavily.com</a></span>
+              </div>
+              <div className="sm:w-3/4">
+                <input
+                  type="password"
+                  placeholder="Tavily API Key (tvly-...)"
+                  className="input-field w-full"
+                  value={tavilyKey}
+                  onChange={(e) => setTavilyKey(e.target.value)}
+                />
+                <span className="block text-[11px] text-[var(--color-accent-orange)] mt-2">
+                  💡 <strong>Note:</strong> Used for fast parallel search over freelancing platforms (Upwork, Fiverr) & social media.
+                </span>
+              </div>
             </div>
-            <div className="sm:w-3/4">
-              <input
-                type="password"
-                placeholder="Tavily API Key (tvly-...)"
-                className="input-field w-full"
-                value={tavilyKey}
-                onChange={(e) => setTavilyKey(e.target.value)}
-              />
-              <span className="block text-[11px] text-[var(--color-accent-orange)] mt-2">
-                💡 <strong>Note:</strong> If no Tavily key is configured, search agents will automatically fall back to the built-in free DuckDuckGo scraper.
-              </span>
+
+            <div className="flex flex-col sm:flex-row sm:items-start gap-4 p-4 rounded-xl border border-[var(--color-border-light)] bg-[rgba(255,255,255,0.02)]">
+              <div className="sm:w-1/4 pt-2">
+                <label className="font-medium text-[var(--color-text-secondary)]">DuckDuckGo Search Key</label>
+                <span className="block text-[10px] text-[var(--color-text-disabled)] mt-1">Configure search integration (Optional)</span>
+              </div>
+              <div className="sm:w-3/4">
+                <input
+                  type="password"
+                  placeholder="DuckDuckGo key or identifier (Optional)"
+                  className="input-field w-full"
+                  value={duckduckgoKey}
+                  onChange={(e) => setDuckduckgoKey(e.target.value)}
+                />
+                <span className="block text-[11px] text-[var(--color-accent-orange)] mt-2">
+                  💡 <strong>Note:</strong> Used by search agents to verify current trends and find direct job portals on official company pages.
+                </span>
+              </div>
             </div>
           </div>
         </div>

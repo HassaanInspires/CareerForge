@@ -161,6 +161,7 @@ export async function POST(req: NextRequest) {
       model, 
       userApiKey,
       tavilyApiKey = '',
+      duckduckgoKey = '',
       depth = 'quick' // 'quick' (5 jobs) or 'deep' (15 jobs)
     } = body;
 
@@ -186,6 +187,9 @@ export async function POST(req: NextRequest) {
     if (!tavilyApiKey) {
       tavilyApiKey = user.tavilyKey || '';
     }
+    if (!duckduckgoKey) {
+      duckduckgoKey = user.duckduckgoKey || '';
+    }
 
     if (!providerName || !model) {
       return NextResponse.json({ error: 'LLM provider and model are required' }, { status: 400 });
@@ -207,11 +211,13 @@ export async function POST(req: NextRequest) {
     // 1. Fetch from Tavily if key exists, otherwise crawl DuckDuckGo
     if (tavilyApiKey && tavilyApiKey.trim().startsWith('tvly-')) {
       console.log("Using Tavily Search engine...");
-      // Search Upwork/Fiverr/Freelancer/LinkedIn in parallel
+      // Search Upwork/Fiverr/Freelancer/LinkedIn and direct company ATS pages in parallel
       const searchQueries = [
         `site:upwork.com/jobs OR site:upwork.com/freelance-jobs "${query}"`,
         `site:linkedin.com/jobs/view OR site:linkedin.com/jobs "${query}" "${location}"`,
-        `site:freelancer.com/projects OR site:fiverr.com "${query}"`
+        `site:freelancer.com/projects OR site:fiverr.com "${query}"`,
+        `site:greenhouse.io OR site:lever.co OR site:*.jobs "${query}" "${location}"`,
+        `"${query}" career portal jobs OR hiring "${location}"`
       ];
       
       const crawledArrays = await Promise.all(
@@ -220,9 +226,12 @@ export async function POST(req: NextRequest) {
       crawledArrays.forEach(arr => jobsList.push(...arr));
     } else {
       console.log("Tavily key missing. Falling back to DuckDuckGo HTML Scraper + public APIs...");
-      // Fallback search Upwork & LinkedIn
+      // Fallback search Upwork & LinkedIn + Official Company Portals
       const ddgJobs = await crawlDuckDuckGo(`site:upwork.com/jobs OR site:linkedin.com/jobs "${query}" ${location}`);
-      jobsList.push(...ddgJobs);
+      const ddgCompanyJobs = await crawlDuckDuckGo(`site:greenhouse.io OR site:lever.co OR site:*.jobs "${query}" ${location}`);
+      const ddgDirectJobs = await crawlDuckDuckGo(`"${query}" career page OR hiring OR jobs "${location}"`);
+      
+      jobsList.push(...ddgJobs, ...ddgCompanyJobs, ...ddgDirectJobs);
 
       // Add Remotive + Arbeitnow feeds
       try {

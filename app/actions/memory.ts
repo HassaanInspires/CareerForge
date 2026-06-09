@@ -30,9 +30,11 @@ export async function loadUserMemory(): Promise<CandidateMemory | null> {
   // Parse JSON strings back to arrays
   let coreSkills = [];
   let verifiableMetrics = [];
+  let identifiedGaps = [];
   
   try { coreSkills = JSON.parse(memory.coreSkills); } catch(e) {}
   try { verifiableMetrics = JSON.parse(memory.verifiableMetrics); } catch(e) {}
+  try { identifiedGaps = JSON.parse(memory.identifiedGaps || '[]'); } catch(e) {}
 
   const parsedPoW: ProofOfWorkItem[] = pow.map(p => {
     let metrics = {};
@@ -54,8 +56,8 @@ export async function loadUserMemory(): Promise<CandidateMemory | null> {
     coreSkills,
     verifiableMetrics,
     careerGoals: memory.careerGoals || '',
-    identifiedGaps: [],
-    dataSufficiencyScore: 0,
+    identifiedGaps,
+    dataSufficiencyScore: memory.dataSufficiencyScore || 0,
     proofOfWork: parsedPoW,
     verifiedSkills: []
   };
@@ -83,13 +85,17 @@ export async function saveUserMemory(memory: CandidateMemory) {
       careerLevel: memory.careerLevel,
       careerGoals: memory.careerGoals,
       coreSkills: JSON.stringify(memory.coreSkills || []),
-      verifiableMetrics: JSON.stringify(memory.verifiableMetrics || [])
+      verifiableMetrics: JSON.stringify(memory.verifiableMetrics || []),
+      identifiedGaps: JSON.stringify(memory.identifiedGaps || []),
+      dataSufficiencyScore: memory.dataSufficiencyScore || 0
     },
     update: {
       careerLevel: memory.careerLevel,
       careerGoals: memory.careerGoals,
       coreSkills: JSON.stringify(memory.coreSkills || []),
-      verifiableMetrics: JSON.stringify(memory.verifiableMetrics || [])
+      verifiableMetrics: JSON.stringify(memory.verifiableMetrics || []),
+      identifiedGaps: JSON.stringify(memory.identifiedGaps || []),
+      dataSufficiencyScore: memory.dataSufficiencyScore || 0
     }
   });
 
@@ -227,7 +233,8 @@ export async function loadUserSettings() {
     selectedModels,
     activeProvider: user.activeProvider || 'anthropic',
     aiRealism: user.aiRealism || 'brutal',
-    tavilyKey: user.tavilyKey || ''
+    tavilyKey: user.tavilyKey || '',
+    duckduckgoKey: user.duckduckgoKey || ''
   };
 }
 
@@ -237,6 +244,7 @@ export async function saveUserSettings(settings: {
   activeProvider: string;
   aiRealism: string;
   tavilyKey: string;
+  duckduckgoKey: string;
 }) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) throw new Error('Not authenticated');
@@ -254,7 +262,8 @@ export async function saveUserSettings(settings: {
       selectedModels: JSON.stringify(settings.selectedModels),
       activeProvider: settings.activeProvider,
       aiRealism: settings.aiRealism,
-      tavilyKey: settings.tavilyKey
+      tavilyKey: settings.tavilyKey,
+      duckduckgoKey: settings.duckduckgoKey
     }
   });
 

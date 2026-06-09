@@ -23,14 +23,37 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { 
+    let { 
       resumeBase64, 
       resumeFileName, 
       provider: providerName, 
       model, 
       userApiKey,
-      realism = 'brutal'
+      realism
     } = body;
+
+    // Load configurations from Database settings if missing
+    let dbKeys: Record<string, string> = {};
+    let dbModels: Record<string, string> = {};
+    if (user.apiKeys) {
+      try { dbKeys = JSON.parse(user.apiKeys); } catch (e) {}
+    }
+    if (user.selectedModels) {
+      try { dbModels = JSON.parse(user.selectedModels); } catch (e) {}
+    }
+
+    if (!providerName) {
+      providerName = user.activeProvider || 'anthropic';
+    }
+    if (!model) {
+      model = dbModels[providerName] || '';
+    }
+    if (!userApiKey) {
+      userApiKey = dbKeys[providerName] || '';
+    }
+    if (!realism) {
+      realism = user.aiRealism || 'brutal';
+    }
 
     if (!resumeBase64 || !providerName || !model) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });

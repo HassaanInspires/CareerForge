@@ -83,6 +83,14 @@ Started with:
     *   **Route Handler Settings Fallbacks**: Updated `/api/models`, `/api/jobs/search`, `/api/jobs/apply`, `/api/chat`, `/api/optimize`, `/api/challenge/generate`, `/api/challenge/evaluate`, and `/api/refine` to fallback dynamically to the database-backed configuration settings if request payloads are omitted or incomplete.
     *   **CSS Variable Adjustments**: Cleaned up layout font overrides in `app/globals.css`.
 
+### Phase 9: CV Sync & DuckDuckGo Search Integration (V10.0)
+*   **Objective**: Solve the onboarding chat synchronization bug, persist RAG metadata and candidate gaps in the database, and allow search engines to query official company sites using DuckDuckGo search keys.
+*   **Implementation**:
+    *   **Candidate Memory Persistence**: Added `dataSufficiencyScore` and `identifiedGaps` columns to the `CandidateMemory` database schema. Updated loading and saving actions to synchronize these variables, ensuring user onboarding states persist correctly.
+    *   **DuckDuckGo Search Integration**: Added `duckduckgoKey` to the settings model. The `/settings` dashboard now lets users store a DuckDuckGo Search Key.
+    *   **Official Company Careers Targeting**: Configured `/api/jobs/search` to pull the new DuckDuckGo Key and run direct query patterns targeting Greenhouse, Lever, and official `*.jobs` career portals, finding opportunities that are not listed on Upwork or LinkedIn.
+    *   **Onboarding Setup Fallbacks**: Integrated settings checks on page load to configure warning banners using database configurations instead of relying solely on local storage.
+
 ---
 
 ## 3. Code Modifications & Repository Health
@@ -91,13 +99,13 @@ Started with:
 *   [`prisma/schema.prisma`](file:///careerforge/prisma/schema.prisma): Database definitions for `User`, `CandidateMemory` (with chatLog), `ProofOfWork`, `SessionHistory`, and `CareerChunk`.
 *   [`lib/vector.ts`](file:///careerforge/lib/vector.ts): Hugging Face embedding pipeline and Prisma raw query similarity search engine.
 *   [`app/api/auth/[...nextauth]/route.ts`](file:///careerforge/app/api/auth/[...nextauth]/route.ts): NextAuth.js authentication configuration with credentials and `bcryptjs`.
-*   [`app/actions/memory.ts`](file:///careerforge/actions/memory.ts): Next.js Server Actions connecting the UI components to the Prisma database safely (memory, history, and chat logs).
+*   [`app/actions/memory.ts`](file:///careerforge/actions/memory.ts): Next.js Server Actions connecting the UI components to the Prisma database safely (memory, settings, history, and chat logs).
 *   [`app/admin/page.tsx`](file:///careerforge/app/admin/page.tsx): Secure server-side rendered Admin dashboard to monitor platform usage.
 *   [`app/builder/page.tsx`](file:///careerforge/app/builder/page.tsx): Redesigned into the TargetMatch Engine, saving results straight to Postgres history.
 *   [`app/profile/page.tsx`](file:///careerforge/app/profile/page.tsx): Candidate profile dashboard reading/writing entirely from/to database actions, adding missing key warnings.
 *   [`app/jobs/page.tsx`](file:///careerforge/app/jobs/page.tsx): Job Hunt Agent interface displaying real-time vacancies, trust/fit analyses, and custom proposal generation modals.
 *   [`app/api/jobs/search/route.ts`](file:///careerforge/api/jobs/search/route.ts): Background agent crawler executing public matches, Tavily API calls, DuckDuckGo free scraper queries, and JSON validation.
-*   [`app/api/jobs/apply/route.ts`](file:///careerforge/app/api/jobs/apply/route.ts): Strategic cover letter and proposal builder pulling credentials from Postgres memory.
+*   [`app/api/jobs/apply/route.ts`](file:///careerforge/api/jobs/apply/route.ts): Strategic cover letter and proposal builder pulling credentials from Postgres memory.
 *   [`app/api/chat/route.ts`](file:///careerforge/app/api/chat/route.ts): RAG-capable conversation loop that reads candidate context from pgvector chunks.
 
 ---
@@ -142,7 +150,8 @@ Started with:
 ✅ Agentic Job Matcher & Authenticity Validator dashboard (/jobs)
 ✅ Live Remotive & Arbeitnow crawlers without custom search API fees
 ✅ Tavily Deep Search Integration + unauthenticated DuckDuckGo scraper fallback
-✅ Freelance (Upwork, Fiverr, Freelancer) and LinkedIn deep targeting
+✅ DuckDuckGo API key settings input support
+✅ Deep search across Greenhouse, Lever, and official company `*.jobs` websites
 ✅ AI Proposal & Tailored Application Pitch strategy builder (/api/jobs/apply)
 ✅ Google Font offline compilation compile-time bypass
 ✅ Copy-to-clipboard
