@@ -327,7 +327,13 @@ export default function JobAgentPage() {
                 </span>
               </div>
               <span className="text-[9px] uppercase font-mono tracking-wider px-1.5 py-0.5 rounded bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)] text-[var(--color-text-disabled)]">
-                {job.source === 'tavily' ? '🚀 via Tavily' : '🔍 via DuckDuckGo'}
+                {job.source === 'tavily' 
+                  ? '🚀 via Tavily' 
+                  : job.source === 'adzuna' 
+                  ? '💼 via Adzuna' 
+                  : job.source === 'themuse' 
+                  ? '🎨 via The Muse' 
+                  : '🔍 via DuckDuckGo'}
               </span>
             </div>
           </div>

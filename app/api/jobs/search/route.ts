@@ -12,7 +12,7 @@ interface JobSourceItem {
   salary: string;
   description: string;
   isRemote: boolean;
-  source: 'tavily' | 'duckduckgo';
+  source: 'tavily' | 'duckduckgo' | 'adzuna' | 'themuse';
 }
 
 // 1. DuckDuckGo Free Search Scraper (100% Free, No Key Required)
@@ -35,12 +35,10 @@ async function crawlDuckDuckGo(searchQuery: string): Promise<JobSourceItem[]> {
     const html = await res.text();
 
     const results: JobSourceItem[] = [];
-    // Split by result block containers
     const resultBlocks = html.split(/class="[^"]*result[^"]*"/);
 
     for (let i = 1; i < resultBlocks.length; i++) {
       const block = resultBlocks[i];
-      // Permissive regex to match anchor link and title inside the result container
       const urlMatch = block.match(/href="([^"]+)"/) || block.match(/href='([^']+)'/);
       const titleMatch = block.match(/class="result__a"[^>]*>([\s\S]*?)<\/a>/) || 
                          block.match(/class="result__url"[^>]*>([\s\S]*?)<\/a>/) ||
@@ -55,7 +53,6 @@ async function crawlDuckDuckGo(searchQuery: string): Promise<JobSourceItem[]> {
           }
         }
         
-        // Skip duckduckgo internal links
         if (link.startsWith('/') || link.includes('duckduckgo.com/')) {
           continue;
         }
@@ -70,7 +67,6 @@ async function crawlDuckDuckGo(searchQuery: string): Promise<JobSourceItem[]> {
                              block.match(/<td[^>]*>([\s\S]*?)<\/td>/);
         const snippetText = snippetMatch ? snippetMatch[1].replace(/<[^>]*>/g, '').trim() : '';
 
-        // Extract company from title (e.g. "React Developer - Upwork" or "React Developer at Stripe")
         let company = 'Web Listing';
         let cleanTitle = titleText;
         if (titleText.includes('at ')) {
@@ -87,7 +83,6 @@ async function crawlDuckDuckGo(searchQuery: string): Promise<JobSourceItem[]> {
           company = split[1].trim();
         }
 
-        // Deduce remote status
         const isRemote = searchQuery.toLowerCase().includes('remote') || 
                          titleText.toLowerCase().includes('remote') || 
                          snippetText.toLowerCase().includes('remote');
@@ -166,6 +161,115 @@ async function crawlTavily(searchQuery: string, apiKey: string): Promise<JobSour
   }
 }
 
+// 3. Adzuna API Crawler (Persists app_id and app_key in User model keys)
+async function crawlAdzuna(query: string, location: string, appId: string, appKey: string): Promise<JobSourceItem[]> {
+  try {
+    let country = 'us';
+    const locLower = location.toLowerCase();
+    if (locLower.includes('uk') || locLower.includes('gb') || locLower.includes('london') || locLower.includes('united kingdom')) {
+      country = 'gb';
+    } else if (locLower.includes('ca') || locLower.includes('canada') || locLower.includes('toronto')) {
+      country = 'ca';
+    } else if (locLower.includes('in') || locLower.includes('india') || locLower.includes('mumbai') || locLower.includes('bangalore')) {
+      country = 'in';
+    } else if (locLower.includes('de') || locLower.includes('germany') || locLower.includes('berlin')) {
+      country = 'de';
+    } else if (locLower.includes('fr') || locLower.includes('france') || locLower.includes('paris')) {
+      country = 'fr';
+    } else if (locLower.includes('au') || locLower.includes('australia') || locLower.includes('sydney')) {
+      country = 'au';
+    }
+
+    const url = `https://api.adzuna.com/v1/api/jobs/${country}/search/1?app_id=${appId}&app_key=${appKey}&what=${encodeURIComponent(query)}&results_per_page=30&content-type=application/json`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.warn("Adzuna API returned status:", res.status);
+      return [];
+    }
+    const data = await res.json();
+    if (!data.results || !Array.isArray(data.results)) return [];
+
+    return data.results.map((r: any) => {
+      const title = (r.title || '').replace(/<[^>]*>/g, '').trim();
+      const company = r.company?.display_name || 'Web Listing';
+      const link = r.redirect_url || '';
+      const description = (r.description || '').replace(/<[^>]*>/g, '').substring(0, 1000);
+      const locationName = r.location?.display_name || 'Remote/Worldwide';
+
+      const isRemote = locLower.includes('remote') || 
+                       title.toLowerCase().includes('remote') || 
+                       description.toLowerCase().includes('remote');
+
+      return {
+        title,
+        company,
+        url: link,
+        location: locationName,
+        salary: r.salary_min ? `$${Math.round(r.salary_min / 1000)}k - $${Math.round(r.salary_max / 1000)}k` : 'Negotiable',
+        description,
+        isRemote,
+        source: 'adzuna'
+      };
+    });
+  } catch (error) {
+    console.error("Adzuna API crawl failed:", error);
+    return [];
+  }
+}
+
+// 4. The Muse API (Public Directory - Zero Key Required)
+async function crawlTheMuse(query: string): Promise<JobSourceItem[]> {
+  try {
+    const url = `https://www.themuse.com/api/public/jobs?page=1&category=Engineering&category=Software+Engineering&category=Design&category=Data+Science&category=Product+Management`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.warn("The Muse API returned status:", res.status);
+      return [];
+    }
+    const data = await res.json();
+    if (!data.results || !Array.isArray(data.results)) return [];
+
+    const results: JobSourceItem[] = [];
+    const queryTokens = query.toLowerCase().split(/[\s,+-]+/).filter((w: string) => w.length > 2);
+
+    data.results.forEach((r: any) => {
+      const title = r.name || '';
+      const company = r.company?.name || 'The Muse Partner';
+      const link = r.refs?.landing_page || '';
+      const description = (r.contents || '').replace(/<[^>]*>/g, '').substring(0, 1000);
+      const locations = r.locations?.map((l: any) => l.name).join(', ') || 'Remote';
+
+      const isRemote = locations.toLowerCase().includes('remote') || 
+                       title.toLowerCase().includes('remote') || 
+                       description.toLowerCase().includes('remote');
+
+      // Local query keyword filter
+      const matchesQuery = queryTokens.length === 0 || queryTokens.some((token: string) => 
+        title.toLowerCase().includes(token) || 
+        description.toLowerCase().includes(token)
+      );
+
+      if (matchesQuery) {
+        results.push({
+          title,
+          company,
+          url: link,
+          location: locations,
+          salary: 'Estimated based on spec',
+          description,
+          isRemote,
+          source: 'themuse'
+        });
+      }
+    });
+
+    return results;
+  } catch (error) {
+    console.error("The Muse API crawl failed:", error);
+    return [];
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -190,11 +294,10 @@ export async function POST(req: NextRequest) {
       model, 
       userApiKey,
       tavilyApiKey = '',
-      engineSource = 'mixed', // 'mixed' | 'tavily' | 'duckduckgo'
-      depth = 'quick' // 'quick' (6 jobs) or 'deep' (12 jobs)
+      engineSource = 'mixed', 
+      depth = 'quick'
     } = body;
 
-    // Load settings from Database if missing
     let dbKeys: Record<string, string> = {};
     let dbModels: Record<string, string> = {};
     if (user.apiKeys) {
@@ -217,11 +320,13 @@ export async function POST(req: NextRequest) {
       tavilyApiKey = user.tavilyKey || '';
     }
 
+    const adzunaAppId = dbKeys.adzunaAppId || '';
+    const adzunaAppKey = dbKeys.adzunaAppKey || '';
+
     if (!providerName || !model) {
       return NextResponse.json({ error: 'LLM provider and model are required' }, { status: 400 });
     }
 
-    // Load Candidate Memory Details
     let coreSkills: string[] = [];
     let careerLevel = 'Unknown';
     if (user.memory) {
@@ -233,53 +338,51 @@ export async function POST(req: NextRequest) {
     let searchWarning = '';
 
     const hasTavilyKey = tavilyApiKey && tavilyApiKey.trim().startsWith('tvly-');
-    
-    // Resolve search engine preference and fallbacks
     let selectedEngine = engineSource;
     if ((selectedEngine === 'tavily' || selectedEngine === 'mixed') && !hasTavilyKey) {
       selectedEngine = 'duckduckgo';
-      searchWarning = 'Tavily API key is missing or invalid. Automatically falling back to DuckDuckGo Free Scraper.';
+      searchWarning = 'Tavily API key is missing. Automatically falling back to DuckDuckGo Scraper & Public Directories.';
     }
 
+    // Accumulate parallel search promises
+    const promises: Promise<JobSourceItem[]>[] = [];
+
     if (selectedEngine === 'tavily') {
-      console.log("Crawling via Tavily only...");
       const searchQueries = [
         `site:upwork.com/jobs OR site:upwork.com/freelance-jobs "${query}"`,
         `site:linkedin.com/jobs/view OR site:linkedin.com/jobs "${query}" "${location}"`,
         `site:greenhouse.io OR site:lever.co OR site:*.jobs "${query}" "${location}"`,
       ];
-      const crawledArrays = await Promise.all(
-        searchQueries.map(q => crawlTavily(q, tavilyApiKey))
-      );
-      crawledArrays.forEach(arr => jobsList.push(...arr));
+      searchQueries.forEach(q => promises.push(crawlTavily(q, tavilyApiKey)));
     } else if (selectedEngine === 'duckduckgo') {
-      console.log("Crawling via DuckDuckGo Free...");
-      const ddgJobs = await crawlDuckDuckGo(`site:upwork.com/jobs OR site:linkedin.com/jobs "${query}" ${location}`);
-      const ddgCompanyJobs = await crawlDuckDuckGo(`site:greenhouse.io OR site:lever.co OR site:*.jobs "${query}" ${location}`);
-      const ddgDirectJobs = await crawlDuckDuckGo(`"${query}" career page OR hiring OR jobs "${location}"`);
-      jobsList.push(...ddgJobs, ...ddgCompanyJobs, ...ddgDirectJobs);
+      promises.push(crawlDuckDuckGo(`site:upwork.com/jobs OR site:linkedin.com/jobs "${query}" ${location}`));
+      promises.push(crawlDuckDuckGo(`site:greenhouse.io OR site:lever.co OR site:*.jobs "${query}" ${location}`));
+      promises.push(crawlDuckDuckGo(`"${query}" career page OR hiring OR jobs "${location}"`));
     } else {
-      // Mixed - Parallel fetch from both
-      console.log("Crawling via Mixed Engines...");
-      const tavilyPromise = crawlTavily(`site:upwork.com/jobs "${query}" ${location}`, tavilyApiKey);
-      const ddgPromise = crawlDuckDuckGo(`site:linkedin.com/jobs "${query}" ${location}`);
-      const ddgCompanyPromise = crawlDuckDuckGo(`site:greenhouse.io OR site:lever.co OR site:*.jobs "${query}" ${location}`);
-      
-      const [tavilyJobs, ddgJobs, ddgCompanyJobs] = await Promise.all([
-        tavilyPromise,
-        ddgPromise,
-        ddgCompanyPromise
-      ]);
-      jobsList.push(...tavilyJobs, ...ddgJobs, ...ddgCompanyJobs);
+      promises.push(crawlTavily(`site:upwork.com/jobs "${query}" ${location}`, tavilyApiKey));
+      promises.push(crawlDuckDuckGo(`site:linkedin.com/jobs "${query}" ${location}`));
+      promises.push(crawlDuckDuckGo(`site:greenhouse.io OR site:lever.co OR site:*.jobs "${query}" ${location}`));
     }
 
-    // Always fetch public Remotive & Arbeitnow feeds as extra sources in DuckDuckGo/Mixed searches
-    if (selectedEngine === 'duckduckgo' || selectedEngine === 'mixed') {
-      try {
-        const remotiveRes = await fetch(`https://remotive.com/api/remote-jobs?search=${encodeURIComponent(query)}&limit=35`);
-        if (remotiveRes.ok) {
-          const data = await remotiveRes.json();
-          if (data.jobs && Array.isArray(data.jobs)) {
+    // Always fetch The Muse (Public)
+    promises.push(crawlTheMuse(query));
+
+    // Fetch Adzuna if credentials exist
+    if (adzunaAppId && adzunaAppKey) {
+      promises.push(crawlAdzuna(query, location, adzunaAppId, adzunaAppKey));
+    }
+
+    const crawledResults = await Promise.all(promises);
+    crawledResults.forEach(arr => jobsList.push(...arr));
+
+    // Fetch public Remotive & Arbeitnow feeds as extra sources in parallel
+    const extraPromises: Promise<void>[] = [];
+    
+    extraPromises.push(
+      fetch(`https://remotive.com/api/remote-jobs?search=${encodeURIComponent(query)}&limit=35`)
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data && data.jobs && Array.isArray(data.jobs)) {
             data.jobs.forEach((j: any) => {
               jobsList.push({
                 title: j.title || '',
@@ -293,14 +396,14 @@ export async function POST(req: NextRequest) {
               });
             });
           }
-        }
-      } catch (e) {}
+        }).catch(() => {})
+    );
 
-      try {
-        const arbeitRes = await fetch('https://www.arbeitnow.com/api/job-board-api');
-        if (arbeitRes.ok) {
-          const data = await arbeitRes.json();
-          if (data.data && Array.isArray(data.data)) {
+    extraPromises.push(
+      fetch('https://www.arbeitnow.com/api/job-board-api')
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data && data.data && Array.isArray(data.data)) {
             data.data.forEach((j: any) => {
               jobsList.push({
                 title: j.title || '',
@@ -314,9 +417,10 @@ export async function POST(req: NextRequest) {
               });
             });
           }
-        }
-      } catch (e) {}
-    }
+        }).catch(() => {})
+    );
+
+    await Promise.all(extraPromises);
 
     // Deduplicate lists based on Title & Company
     const seen = new Set<string>();
@@ -327,28 +431,68 @@ export async function POST(req: NextRequest) {
       return true;
     });
 
-    // Fuzzy token filter to ensure relevance but expand search volume
-    const searchTokens = query.toLowerCase().split(/[\s,+-]+/).filter((w: string) => w.length > 2);
-    if (searchTokens.length > 0) {
-      dedupedJobs = dedupedJobs.filter(j => {
-        return searchTokens.some((token: string) => 
-          j.title.toLowerCase().includes(token) ||
-          j.description.toLowerCase().includes(token) ||
-          j.company.toLowerCase().includes(token)
-        );
-      });
-    }
-
     if (dedupedJobs.length === 0) {
       return NextResponse.json({ jobs: [], warning: searchWarning });
     }
 
-    // Slice based on search depth
-    const maxItems = depth === 'deep' ? 12 : 6;
-    const candidateJobs = dedupedJobs.slice(0, maxItems);
-
-    // 3. AI Authenticity, Match, Salary & Fit Rationale Verification
+    // 5. STAGE 1: AI Relevance Gatekeeper pipeline
+    // Uses a fast LLM validation request to separate genuine job postings from blog spam, guidebooks, and unrelated indexes.
     const provider = getProvider(providerName);
+    
+    const gatekeeperPrompt = `
+You are the CareerForge AI Relevance Gatekeeper.
+Your job is to analyze the following candidate job listing results and identify which ones are GENUINE, active job postings matching the query "${query}".
+Discard spam links, developer guides, tutorial documentation, old articles, homepage indexes, and completely unrelated roles.
+
+Candidate Core Skills: ${coreSkills.join(', ')}
+
+--- CANDIDATE JOB LISTINGS ---
+${dedupedJobs.map((job, idx) => `
+ID: ${idx}
+Title: ${job.title}
+Company: ${job.company}
+Location: ${job.location}
+Snippet: ${job.description.substring(0, 300)}...
+`).join('\n---\n')}
+
+Identify which IDs are real, relevant job listings. Return ONLY a valid JSON object matching this structure:
+{
+  "relevantIds": [0, 2]
+}
+`;
+
+    let pureJobs = dedupedJobs;
+    try {
+      const rawGatekeeperResponse = await provider.callAPI(gatekeeperPrompt, userApiKey || '', model);
+      const gatekeeperJsonMatch = rawGatekeeperResponse.match(/\{[\s\S]*\}/);
+      const gatekeeperJson = JSON.parse(gatekeeperJsonMatch ? gatekeeperJsonMatch[0] : rawGatekeeperResponse);
+      const relevantIds = gatekeeperJson.relevantIds || [];
+      
+      if (Array.isArray(relevantIds) && relevantIds.length > 0) {
+        pureJobs = dedupedJobs.filter((_, idx) => relevantIds.includes(idx));
+      }
+    } catch (gatekeeperErr) {
+      console.warn("Gatekeeper relevance check failed. Falling back to fuzzy token matched filtering.", gatekeeperErr);
+      const searchTokens = query.toLowerCase().split(/[\s,+-]+/).filter((w: string) => w.length > 2);
+      if (searchTokens.length > 0) {
+        pureJobs = dedupedJobs.filter(j => {
+          return searchTokens.some((token: string) => 
+            j.title.toLowerCase().includes(token) ||
+            j.description.toLowerCase().includes(token) ||
+            j.company.toLowerCase().includes(token)
+          );
+        });
+      }
+    }
+
+    if (pureJobs.length === 0) {
+      return NextResponse.json({ jobs: [], warning: searchWarning });
+    }
+
+    const maxItems = depth === 'deep' ? 12 : 6;
+    const candidateJobs = pureJobs.slice(0, maxItems);
+
+    // 6. STAGE 2: AI Fit scoring, Trust Audit & Competency Validation
     const evaluationPrompt = `
 You are the AI Job Agent & Authenticity Validator of CareerForge.
 Your job is to evaluate a roster of job postings against a candidate's profile to score the fit, explain why they are a good match, and explain any mismatch.
@@ -396,8 +540,6 @@ Return ONLY a valid JSON object matching this exact structure:
 `;
 
     const rawResponse = await provider.callAPI(evaluationPrompt, userApiKey || '', model);
-    
-    // Parse response
     const jsonMatch = rawResponse.match(/\{[\s\S]*\}/);
     const jsonString = jsonMatch ? jsonMatch[0] : rawResponse;
     const result = JSON.parse(jsonString);

@@ -309,6 +309,32 @@ export default function SettingsPage() {
                 </span>
               </div>
             </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-start gap-4 p-4 rounded-xl border border-[var(--color-border-light)] bg-[rgba(255,255,255,0.02)]">
+              <div className="sm:w-1/4 pt-2">
+                <label className="font-medium text-[var(--color-text-secondary)]">Adzuna API Credentials</label>
+                <span className="block text-[10px] text-[var(--color-text-disabled)] mt-1">Get free App ID and App Key at <a href="https://developer.adzuna.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-white">developer.adzuna.com</a></span>
+              </div>
+              <div className="sm:w-3/4 space-y-3">
+                <input
+                  type="text"
+                  placeholder="Adzuna App ID"
+                  className="input-field w-full"
+                  value={keys['adzunaAppId'] || ''}
+                  onChange={(e) => setKeys({ ...keys, adzunaAppId: e.target.value })}
+                />
+                <input
+                  type="password"
+                  placeholder="Adzuna App Key"
+                  className="input-field w-full"
+                  value={keys['adzunaAppKey'] || ''}
+                  onChange={(e) => setKeys({ ...keys, adzunaAppKey: e.target.value })}
+                />
+                <span className="block text-[11px] text-[var(--color-accent-orange)] mt-2">
+                  💡 <strong>Note:</strong> Used to search millions of verified real job listings globally with direct application links.
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 
