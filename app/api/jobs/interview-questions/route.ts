@@ -62,12 +62,14 @@ Description: ${description || 'Not specified'}
 
 Candidate Core Skills: ${coreSkills.join(', ')}
 
-Analyze the job description and compare it to the candidate's skills. Generate exactly 3 highly customized interview questions that will help the AI write a significantly better, hyper-tailored cover letter for them.
+Analyze the job description and compare it to the candidate's skills. Generate exactly 5 highly customized interview questions that will help the AI write a significantly better, hyper-tailored, and highly personalized cover letter for them.
 
 The questions MUST match this structure:
 - Question 1: A Multiple Choice Question (MCQ) asking about their experience or comfort level with a specific key technology or domain in the job description. Provide 3-4 options.
-- Question 2: A Select-Multiple or Yes/No question asking about specific certifications, availability, or preferences related to this role. Provide 2-4 options.
-- Question 3: A Short-Answer question prompting the user to summarize a specific past project or achievement relevant to this role (1-line answer).
+- Question 2: A second MCQ asking about their preference for system design, code architecture, or developer philosophy required by this job. Provide 3-4 options.
+- Question 3: A Select-Multiple question asking about specific tools, certifications, or libraries they are confident using for this role. Provide 3-4 options.
+- Question 4: A Short-Answer question requesting clarification on availability, preferred communication schedules, or timezone alignments.
+- Question 5: A Short-Answer question prompting the user to outline a specific past project or achievement where they used similar technologies (1-line answer).
 
 Return ONLY a valid JSON object matching this exact structure:
 {
@@ -80,14 +82,25 @@ Return ONLY a valid JSON object matching this exact structure:
     },
     {
       "id": "q2",
-      "type": "multi",
-      "question": "Which of the following aspects of this job are you most confident in? (Select all that apply)",
-      "options": ["Next.js App Router", "Tailwind CSS styling", "Prisma Database ORM"]
+      "type": "mcq",
+      "question": "Which architecture philosophy do you prefer for modular web applications?",
+      "options": ["Monolith with domain separation", "Serverless micro-frontends", "Strict MVC modular layouts"]
     },
     {
       "id": "q3",
+      "type": "multi",
+      "question": "Which of these backend tools are you most confident integrating? (Select all that apply)",
+      "options": ["Prisma / PostgreSQL", "Redis Caching", "Docker Containers", "GraphQL APIs"]
+    },
+    {
+      "id": "q4",
       "type": "text",
-      "question": "Briefly describe one system-design or web application project you have shipped using these technologies:"
+      "question": "What is your timezone alignment preference or daily availability window for this role?"
+    },
+    {
+      "id": "q5",
+      "type": "text",
+      "question": "Briefly summarize one high-traffic database or web application project you have shipped:"
     }
   ]
 }

@@ -68,9 +68,12 @@ export default function JobAgentPage() {
   const [proposalJob, setProposalJob] = useState<Job | null>(null);
   const [proposalData, setProposalData] = useState<{
     proposal: string;
+    valueHook: string;
     requiredAttachments: string[];
     salaryNegotiation: string;
     checklist: string[];
+    customizationGuide: string;
+    followUpTimeline: string[];
   } | null>(null);
   const [isGeneratingProposal, setIsGeneratingProposal] = useState(false);
   const [proposalError, setProposalError] = useState<string | null>(null);
@@ -211,8 +214,7 @@ export default function JobAgentPage() {
       if (!res.ok) throw new Error(data.error || 'Failed to load questions');
       setInterviewQuestions(data.questions || []);
     } catch (err: any) {
-      // Fallback if AI question compilation fails: skip directly to generating cover letter
-      console.warn("Interview prep compilation failed. Falling back to direct generation.", err);
+      console.warn("Interview questions generation failed. Skipping to direct pitch generation.", err);
       setInterviewJob(null);
       handleGenerateProposal(job, []);
     } finally {
@@ -229,7 +231,7 @@ export default function JobAgentPage() {
     } else if (currentQ.type === 'multi') {
       answer = selectedMultiAnswers.length > 0 ? selectedMultiAnswers.join(', ') : 'None selected';
     } else {
-      answer = shortTextAnswer || 'No specific past project to declare';
+      answer = shortTextAnswer || 'No specific answer provided';
     }
 
     const newAnswers = [...finalAnswersList, { question: currentQ.question, answer }];
@@ -237,12 +239,12 @@ export default function JobAgentPage() {
 
     if (currentQuestionIndex < interviewQuestions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
-      // Reset inputs for next question
+      // Reset inputs
       setSelectedMCQAnswer('');
       setSelectedMultiAnswers([]);
       setShortTextAnswer('');
     } else {
-      // Finished all questions! Trigger Cover letter generator with answer context
+      // Finished all questions! Trigger Cover letter generator with answers
       const targetJob = interviewJob!;
       setInterviewJob(null);
       handleGenerateProposal(targetJob, newAnswers);
@@ -595,7 +597,7 @@ export default function JobAgentPage() {
                   ⚡ Refining Application Strategy
                 </h3>
                 <p className="text-xs text-[var(--color-text-secondary)] mt-1">
-                  Answer 3 quick questions to help AI write a hyper-personalized cover letter for {interviewJob.title} at {interviewJob.company}.
+                  Answer these quick questions to help AI write a hyper-personalized cover letter for {interviewJob.title} at {interviewJob.company}.
                 </p>
               </div>
               <button
@@ -743,8 +745,16 @@ export default function JobAgentPage() {
                 Error generating application pitch: {proposalError}
               </div>
             ) : proposalData ? (
-              <div className="space-y-6 animate-fade-in text-sm leading-relaxed">
-                {/* Tailored Cover Letter / Proposal */}
+              <div className="space-y-6 animate-fade-in text-sm leading-relaxed max-h-[70vh] overflow-y-auto pr-2">
+                
+                {/* 1. Value Proposition Hook */}
+                {proposalData.valueHook && (
+                  <div className="p-4 rounded-lg bg-gradient-to-r from-[rgba(147,51,234,0.12)] to-[rgba(59,130,246,0.12)] border border-[rgba(147,51,234,0.25)] text-center text-xs font-semibold text-white">
+                    💡 <strong className="text-[var(--color-accent-purple)]">AI Pitch Hook:</strong> "{proposalData.valueHook}"
+                  </div>
+                )}
+
+                {/* 2. Cover Letter */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <h4 className="text-xs uppercase font-bold tracking-wider text-[var(--color-accent-blue)]">
@@ -762,7 +772,19 @@ export default function JobAgentPage() {
                   </pre>
                 </div>
 
-                {/* Salary Negotiation Strategy */}
+                {/* 3. Customization Resume Guide */}
+                {proposalData.customizationGuide && (
+                  <div className="space-y-2">
+                    <h4 className="text-xs uppercase font-bold tracking-wider text-[var(--color-accent-blue)]">
+                      🛠️ Portfolio & Resume Customization Guide
+                    </h4>
+                    <div className="p-4 rounded bg-[var(--color-bg-secondary)] border border-[var(--color-border-light)] text-xs text-[var(--color-text-secondary)] leading-relaxed">
+                      {proposalData.customizationGuide}
+                    </div>
+                  </div>
+                )}
+
+                {/* 4. Salary Negotiation */}
                 <div className="space-y-2">
                   <h4 className="text-xs uppercase font-bold tracking-wider text-[var(--color-accent-orange)]">
                     Salary & Rate Negotiation Strategy
@@ -772,8 +794,8 @@ export default function JobAgentPage() {
                   </div>
                 </div>
 
+                {/* 5. Attachments and Prep checklist */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Required Attachments */}
                   <div className="space-y-2">
                     <h4 className="text-xs uppercase font-bold tracking-wider text-[var(--color-success)]">
                       Suggested Attachments / Links
@@ -788,7 +810,6 @@ export default function JobAgentPage() {
                     </ul>
                   </div>
 
-                  {/* Skills Preparation Checklist */}
                   <div className="space-y-2">
                     <h4 className="text-xs uppercase font-bold tracking-wider text-[var(--color-error)]">
                       Interview/Project Prep Checklist
@@ -803,6 +824,35 @@ export default function JobAgentPage() {
                     </ul>
                   </div>
                 </div>
+
+                {/* 6. Follow-up Timeline */}
+                {proposalData.followUpTimeline && proposalData.followUpTimeline.length > 0 && (
+                  <div className="space-y-3 pt-2">
+                    <h4 className="text-xs uppercase font-bold tracking-wider text-[var(--color-accent-purple)]">
+                      📅 Recommended Follow-Up Sequence
+                    </h4>
+                    <div className="relative pl-6 border-l-2 border-[var(--color-border-medium)] space-y-4">
+                      {proposalData.followUpTimeline.map((step, idx) => {
+                        const colonIndex = step.indexOf(':');
+                        const day = colonIndex !== -1 ? step.substring(0, colonIndex) : `Step ${idx + 1}`;
+                        const action = colonIndex !== -1 ? step.substring(colonIndex + 1).trim() : step;
+                        return (
+                          <div key={idx} className="relative">
+                            <span className="absolute -left-[31px] top-0.5 flex items-center justify-center w-4 h-4 rounded-full bg-[var(--color-accent-purple)] text-[8px] font-bold text-white">
+                              {idx + 1}
+                            </span>
+                            <p className="text-xs text-[var(--color-text-primary)] font-semibold mb-0.5">
+                              {day}
+                            </p>
+                            <p className="text-xs text-[var(--color-text-secondary)]">
+                              {action}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex justify-end pt-4 border-t border-[var(--color-border-light)]">
                   <button

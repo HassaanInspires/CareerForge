@@ -18,27 +18,35 @@ interface JobSourceItem {
 // 1. DuckDuckGo Free Search Scraper (100% Free, No Key Required)
 async function crawlDuckDuckGo(searchQuery: string): Promise<JobSourceItem[]> {
   try {
-    const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(searchQuery)}`;
+    const url = `https://html.duckduckgo.com/html/`;
     const res = await fetch(url, {
+      method: 'POST',
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36'
-      }
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: `q=${encodeURIComponent(searchQuery)}`
     });
 
-    if (!res.ok) return [];
+    if (!res.ok) {
+      console.warn("DuckDuckGo HTML scraper returned status:", res.status);
+      return [];
+    }
     const html = await res.text();
 
     const results: JobSourceItem[] = [];
-    const resultBlocks = html.split('<div class="web-result');
+    // Split by result block containers
+    const resultBlocks = html.split(/class="[^"]*result[^"]*"/);
 
     for (let i = 1; i < resultBlocks.length; i++) {
       const block = resultBlocks[i];
-      const titleMatch = block.match(/<a class="result__url"[^>]*>([\s\S]*?)<\/a>/);
-      const urlMatch = block.match(/href="([^"]+)"/);
-      const snippetMatch = block.match(/<a class="result__snippet"[^>]*>([\s\S]*?)<\/a>/);
+      // Permissive regex to match anchor link and title inside the result container
+      const urlMatch = block.match(/href="([^"]+)"/) || block.match(/href='([^']+)'/);
+      const titleMatch = block.match(/class="result__a"[^>]*>([\s\S]*?)<\/a>/) || 
+                         block.match(/class="result__url"[^>]*>([\s\S]*?)<\/a>/) ||
+                         block.match(/<a[^>]*>([\s\S]*?)<\/a>/);
 
-      if (titleMatch && urlMatch) {
-        const titleText = titleMatch[1].replace(/<[^>]*>/g, '').trim();
+      if (urlMatch && titleMatch) {
         let link = urlMatch[1];
         if (link.includes('uddg=')) {
           const parts = link.split('uddg=');
@@ -46,6 +54,20 @@ async function crawlDuckDuckGo(searchQuery: string): Promise<JobSourceItem[]> {
             link = decodeURIComponent(parts[1].split('&')[0]);
           }
         }
+        
+        // Skip duckduckgo internal links
+        if (link.startsWith('/') || link.includes('duckduckgo.com/')) {
+          continue;
+        }
+
+        const titleText = titleMatch[1].replace(/<[^>]*>/g, '').trim();
+        if (!titleText || titleText.toLowerCase().includes('javascript is required')) {
+          continue;
+        }
+
+        const snippetMatch = block.match(/class="result__snippet"[^>]*>([\s\S]*?)<\/a>/) ||
+                             block.match(/class="result__snippet"[^>]*>([\s\S]*?)<\/div>/) ||
+                             block.match(/<td[^>]*>([\s\S]*?)<\/td>/);
         const snippetText = snippetMatch ? snippetMatch[1].replace(/<[^>]*>/g, '').trim() : '';
 
         // Extract company from title (e.g. "React Developer - Upwork" or "React Developer at Stripe")
@@ -57,6 +79,10 @@ async function crawlDuckDuckGo(searchQuery: string): Promise<JobSourceItem[]> {
           company = split[1].split('-')[0].trim();
         } else if (titleText.includes('|')) {
           const split = titleText.split('|');
+          cleanTitle = split[0].trim();
+          company = split[1].trim();
+        } else if (titleText.includes('-')) {
+          const split = titleText.split('-');
           cleanTitle = split[0].trim();
           company = split[1].trim();
         }
@@ -72,7 +98,7 @@ async function crawlDuckDuckGo(searchQuery: string): Promise<JobSourceItem[]> {
           url: link,
           location: isRemote ? 'Remote' : 'Worldwide',
           salary: 'Estimated based on spec',
-          description: snippetText.substring(0, 1000),
+          description: snippetText.substring(0, 1000) || 'Active job opening listed on web directory.',
           isRemote,
           source: 'duckduckgo'
         });
@@ -250,23 +276,21 @@ export async function POST(req: NextRequest) {
     // Always fetch public Remotive & Arbeitnow feeds as extra sources in DuckDuckGo/Mixed searches
     if (selectedEngine === 'duckduckgo' || selectedEngine === 'mixed') {
       try {
-        const remotiveRes = await fetch('https://remotive.com/api/remote-jobs?limit=20');
+        const remotiveRes = await fetch(`https://remotive.com/api/remote-jobs?search=${encodeURIComponent(query)}&limit=35`);
         if (remotiveRes.ok) {
           const data = await remotiveRes.json();
           if (data.jobs && Array.isArray(data.jobs)) {
             data.jobs.forEach((j: any) => {
-              if (j.title.toLowerCase().includes(query.toLowerCase())) {
-                jobsList.push({
-                  title: j.title || '',
-                  company: j.company_name || 'Remotive Recruiter',
-                  url: j.url || '',
-                  location: j.candidate_required_location || 'Remote',
-                  salary: j.salary || 'Not specified',
-                  description: (j.description || '').replace(/<[^>]*>/g, '').substring(0, 1000),
-                  isRemote: true,
-                  source: 'duckduckgo'
-                });
-              }
+              jobsList.push({
+                title: j.title || '',
+                company: j.company_name || 'Remotive Recruiter',
+                url: j.url || '',
+                location: j.candidate_required_location || 'Remote',
+                salary: j.salary || 'Not specified',
+                description: (j.description || '').replace(/<[^>]*>/g, '').substring(0, 1000),
+                isRemote: true,
+                source: 'duckduckgo'
+              });
             });
           }
         }
@@ -278,18 +302,16 @@ export async function POST(req: NextRequest) {
           const data = await arbeitRes.json();
           if (data.data && Array.isArray(data.data)) {
             data.data.forEach((j: any) => {
-              if (j.title.toLowerCase().includes(query.toLowerCase())) {
-                jobsList.push({
-                  title: j.title || '',
-                  company: j.company_name || 'Arbeitnow Hiring',
-                  url: j.url || '',
-                  location: j.location || 'Europe',
-                  salary: 'Negotiable',
-                  description: (j.description || '').replace(/<[^>]*>/g, '').substring(0, 1000),
-                  isRemote: !!j.remote,
-                  source: 'duckduckgo'
-                });
-              }
+              jobsList.push({
+                title: j.title || '',
+                company: j.company_name || 'Arbeitnow Hiring',
+                url: j.url || '',
+                location: j.location || 'Europe',
+                salary: 'Negotiable',
+                description: (j.description || '').replace(/<[^>]*>/g, '').substring(0, 1000),
+                isRemote: !!j.remote,
+                source: 'duckduckgo'
+              });
             });
           }
         }
@@ -304,6 +326,18 @@ export async function POST(req: NextRequest) {
       seen.add(uniqueKey);
       return true;
     });
+
+    // Fuzzy token filter to ensure relevance but expand search volume
+    const searchTokens = query.toLowerCase().split(/[\s,+-]+/).filter((w: string) => w.length > 2);
+    if (searchTokens.length > 0) {
+      dedupedJobs = dedupedJobs.filter(j => {
+        return searchTokens.some((token: string) => 
+          j.title.toLowerCase().includes(token) ||
+          j.description.toLowerCase().includes(token) ||
+          j.company.toLowerCase().includes(token)
+        );
+      });
+    }
 
     if (dedupedJobs.length === 0) {
       return NextResponse.json({ jobs: [], warning: searchWarning });
@@ -351,9 +385,9 @@ Return ONLY a valid JSON object matching this exact structure:
       "fitScore": 85,
       "trustScore": 95,
       "trustExplanation": "Standard company with verifiable domain footprint.",
-      "fitExplanation": "Your deep expertise in React and TypeScript aligns perfectly with the requirements of this front-end role.",
-      "unfitExplanation": "You are missing experience with Shopify or liquid templating required by their theme setup.",
-      "matchedSkills": ["React", "TypeScript"],
+      "fitExplanation": "Your deep expertise in React aligns perfectly with this front-end role.",
+      "unfitExplanation": "You are missing experience with Shopify or liquid templates required for theme setup.",
+      "matchedSkills": ["React"],
       "missingSkills": ["Shopify"],
       "salaryEstimate": "$80k - $100k"
     }

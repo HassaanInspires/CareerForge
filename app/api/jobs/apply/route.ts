@@ -68,6 +68,8 @@ export async function POST(req: NextRequest) {
     }
 
     const powTitles = user.proofOfWork.map(p => `- ${p.title} (${p.type}): ${p.url}`).join('\n');
+    const userName = user.name || 'Candidate';
+    const userEmail = user.email || '';
 
     // Format the interview responses
     let answersContext = '';
@@ -85,6 +87,8 @@ Your job is to draft an exceptional application strategy for a candidate applyin
 The proposal must be authentic, highly professional, completely customized to their actual credentials, and completely free of generic AI fluff.
 
 --- CANDIDATE PROFILE ---
+Name: ${userName}
+Email: ${userEmail}
 Career Level: ${careerLevel}
 Core Skills: ${coreSkills.join(', ')}
 Verifiable Metrics:
@@ -101,17 +105,28 @@ URL: ${url}
 Description: ${description || 'Not specified'}
 
 Formulate:
-1. A tailored proposal / cover letter (max 350 words) that matches their metrics, proof-of-work, and specific interview responses to the job spec. Integrate their interview answers naturally and make it sound realistic, not generated.
-2. A checklist of exactly what attachments to include (e.g. specific GitHub repos, certified CV).
+1. A tailored proposal / cover letter (max 350 words) that matches their metrics, proof-of-work, and specific interview responses to the job spec. Integrate their interview answers naturally.
+   - IMPORTANT: You MUST write the proposal using the candidate's actual name: ${userName} at the signoff. Never use placeholders like '[Your Name]', '[Candidate Name]', or '[Insert Name]'.
+2. A unique Value Proposition Hook (1-sentence) that sets this candidate apart for this specific job role.
 3. A customized salary justification strategy showing how to argue for maximum pay based on their metrics.
-4. A skills preparation list detailing exactly what topics from the job description they should study to succeed in the interview.
+4. A checklist of exactly what attachments to include (e.g. specific GitHub repos, certified CV).
+5. A skills preparation list detailing exactly what topics from the job description they should study to succeed in the interview.
+6. A step-by-step customization guide on how to update/modify their resume/portfolio specifically to stand out for this role.
+7. A follow-up sequence timeline (e.g., Day 3, Day 7, Day 14) showing how and when they should follow up.
 
 Return ONLY a valid JSON object matching this exact structure:
 {
-  "proposal": "The customized pitch / cover letter text...",
+  "proposal": "The customized pitch / cover letter text signed off with ${userName}...",
+  "valueHook": "The unique positioning hook sentence...",
   "requiredAttachments": ["Attachment 1 description", "Attachment 2 description"],
   "salaryNegotiation": "Salary negotiation recommendation text...",
-  "checklist": ["Interview prep item 1", "Interview prep item 2"]
+  "checklist": ["Interview prep item 1", "Interview prep item 2"],
+  "customizationGuide": "Detailed advice on how to tweak their portfolio and resume for this specific position...",
+  "followUpTimeline": [
+    "Day 3: Actionable follow up item...",
+    "Day 7: Actionable follow up item...",
+    "Day 14: Actionable follow up item..."
+  ]
 }
 `;
 
