@@ -106,6 +106,13 @@ Started with:
     *   **Server Actions & Endpoints**: Configured load, save, and onboard endpoints to process and fetch file information securely, and introduced the `deleteUserResume` transaction.
     *   **UI Management Controls**: Built an Active Master Resume Card on the profile dashboard, rendering a download compiler, file swap inputs, and single-click delete.
 
+### Phase 12: CV Automatic Extraction Fix & Manual Trigger (V13.0)
+*   **Objective**: Resolve config extraction lookup failures resulting from deprecated local storage parameters, and introduce a manual dashboard trigger button to analyze database-stored resumes.
+*   **Implementation**:
+    *   **Database Settings Resolution**: Standardized `handleFileUpload` and `handleChat` endpoints to read API credentials directly from database state parameters.
+    *   **Manual Trigger Action**: Coded the `handleAnalyzeCV` caller to request profile parsing dynamically using database-stored PDF base64 contents.
+    *   **Interactive Controls**: Added a "Fetch Details" button to the active resume card and instant extraction links on empty metrics and skills states.
+
 ---
 
 ## 3. Code Modifications & Repository Health
@@ -178,4 +185,7 @@ Started with:
 ✅ Global dark grid background theme aligned across all sub-pages
 ✅ Documentation and Strategic Critique dashboard (`/guide`)
 ✅ Master CV File Storage and Management hub persisted in Supabase database
-✅ Native Base64-to-Blob PDF compiler for local file downloads from PostgreSQLentation and Strategic Critique dashboard (`/guide`)
+✅ Native Base64-to-Blob PDF compiler for local file downloads from PostgreSQL
+✅ Automatic DB-backed settings synchronization for profile onboarding and chat
+✅ Manual "Fetch Details" CV extraction trigger button
+✅ Direct interactive extraction triggers for empty memory stats (skills, metrics)

@@ -36,6 +36,11 @@ export default function ProfileHub() {
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<any | null>(null);
   const [realism, setRealism] = useState<'supportive' | 'brutal'>('brutal');
 
+  // Database-backed settings state
+  const [activeProvider, setActiveProvider] = useState<Provider>('anthropic');
+  const [activeModel, setActiveModel] = useState<string>('');
+  const [apiKey, setApiKey] = useState<string>('');
+
   // V5.0 Pivot: PoW States
   const [githubUser, setGithubUser] = useState('');
   const [isFetchingGithub, setIsFetchingGithub] = useState(false);
@@ -74,14 +79,23 @@ export default function ProfileHub() {
       // Load keys state from DB settings
       const settings = await loadUserSettings();
       if (settings) {
-        const provider = settings.activeProvider;
-        const apiKey = settings.apiKeys[provider] || '';
-        setHasKeys(!!apiKey);
+        const provider = settings.activeProvider as Provider;
+        const key = settings.apiKeys[provider] || '';
+        const modelList = settings.selectedModels || {};
+        const model = modelList[provider] || '';
+        setHasKeys(!!key);
+        setActiveProvider(provider);
+        setActiveModel(model);
+        setApiKey(key);
         setRealism((settings.aiRealism as 'supportive' | 'brutal') || 'brutal');
       } else {
-        const provider = localStorage.getItem('cf_provider') || 'anthropic';
-        const apiKey = localStorage.getItem(`cf_key_${provider}`) || '';
-        setHasKeys(!!apiKey);
+        const provider = (localStorage.getItem('cf_provider') as Provider) || 'anthropic';
+        const key = localStorage.getItem(`cf_key_${provider}`) || '';
+        const model = localStorage.getItem(`cf_model_${provider}`) || '';
+        setHasKeys(!!key);
+        setActiveProvider(provider);
+        setActiveModel(model);
+        setApiKey(key);
         const savedRealism = localStorage.getItem('cf_ai_realism') as 'supportive' | 'brutal';
         if (savedRealism) setRealism(savedRealism);
       }
@@ -109,20 +123,16 @@ export default function ProfileHub() {
         localStorage.setItem(RESUME_STORAGE_KEY, base64);
         setHasResume(true);
 
-        const provider = (localStorage.getItem('cf_provider') as Provider) || 'anthropic';
-        const apiKey = localStorage.getItem(`cf_key_${provider}`) || '';
-        const model = localStorage.getItem(`cf_model_${provider}`) || '';
-
         const res = await fetch('/api/onboard', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             resumeBase64: base64,
             resumeFileName: file.name,
-            provider,
-            model,
+            provider: activeProvider,
+            model: activeModel,
             userApiKey: apiKey,
-            realism // V4.0 Addition
+            realism
           })
         });
 
@@ -147,6 +157,49 @@ export default function ProfileHub() {
     reader.readAsDataURL(file);
   };
 
+  const handleAnalyzeCV = async () => {
+    if (!memory?.resumeBase64) {
+      setError('No resume file found in database. Please upload your CV first.');
+      return;
+    }
+    
+    if (!apiKey) {
+      setError('Missing API Key for ' + activeProvider + '. Please configure it in Settings first.');
+      return;
+    }
+
+    setIsUploading(true);
+    setError('');
+
+    try {
+      const res = await fetch('/api/onboard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          resumeBase64: memory.resumeBase64,
+          resumeFileName: memory.resumeFileName || 'resume.pdf',
+          provider: activeProvider,
+          model: activeModel,
+          userApiKey: apiKey,
+          realism
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      await saveUserMemory(data.memory);
+      setMemory(data.memory);
+      const welcomeLog = [{ role: 'ai' as const, content: 'Hello! I have manually re-analyzed your CV and updated your career memory graph. What would you like to discuss or refine?' }];
+      setChatLog(welcomeLog);
+      await saveUserChatLog(welcomeLog);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleChat = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatInput.trim() || isTyping) return;
@@ -161,10 +214,6 @@ export default function ProfileHub() {
     try {
       await saveUserChatLog(nextChatLog);
 
-      const provider = (localStorage.getItem('cf_provider') as Provider) || 'anthropic';
-      const apiKey = localStorage.getItem(`cf_key_${provider}`) || '';
-      const model = localStorage.getItem(`cf_model_${provider}`) || '';
-
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -172,10 +221,10 @@ export default function ProfileHub() {
           messages: nextChatLog,
           jobDescription: 'Updating Candidate Profile without a specific job description yet.',
           memory: memory,
-          provider,
-          model,
+          provider: activeProvider,
+          model: activeModel,
           userApiKey: apiKey,
-          realism // V4.0 Addition
+          realism
         })
       });
 
@@ -355,6 +404,13 @@ export default function ProfileHub() {
                     Download PDF
                   </button>
                   <button 
+                    onClick={handleAnalyzeCV}
+                    className="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1.5 font-mono text-[var(--color-accent-blue)] border-[rgba(0,212,255,0.2)] hover:border-[var(--color-accent-blue)] hover:bg-[rgba(0,212,255,0.05)]"
+                    disabled={isUploading}
+                  >
+                    {isUploading ? 'Analyzing...' : 'Fetch Details'}
+                  </button>
+                  <button 
                     onClick={() => document.getElementById('profile-cv-replace-upload')?.click()}
                     className="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1.5 font-mono"
                     disabled={isUploading}
@@ -396,7 +452,18 @@ export default function ProfileHub() {
                     <div className="flex flex-wrap gap-2">
                       {memory.coreSkills.length > 0 ? memory.coreSkills.map((s, i) => (
                         <span key={i} className="badge">{s}</span>
-                      )) : <span className="text-sm text-[var(--color-text-disabled)]">No skills extracted yet.</span>}
+                      )) : (
+                        <div className="flex flex-col gap-2">
+                          <span className="text-sm text-[var(--color-text-disabled)]">No skills extracted yet.</span>
+                          <button 
+                            onClick={handleAnalyzeCV}
+                            className="text-xs font-bold text-[var(--color-accent-blue)] hover:underline self-start font-mono"
+                            disabled={isUploading}
+                          >
+                            ⚡ Extract Details
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -408,7 +475,18 @@ export default function ProfileHub() {
                           <span className="text-[var(--color-success)] mt-0.5">✓</span>
                           <span>{m}</span>
                         </li>
-                      )) : <li className="text-sm text-[var(--color-text-disabled)]">No metrics extracted yet.</li>}
+                      )) : (
+                        <li className="text-sm text-[var(--color-text-disabled)] flex flex-col gap-2">
+                          <span>No metrics extracted yet.</span>
+                          <button 
+                            onClick={handleAnalyzeCV}
+                            className="text-xs font-bold text-[var(--color-accent-blue)] hover:underline self-start font-mono"
+                            disabled={isUploading}
+                          >
+                            ⚡ Extract Metrics
+                          </button>
+                        </li>
+                      )}
                     </ul>
                   </div>
                 </div>
