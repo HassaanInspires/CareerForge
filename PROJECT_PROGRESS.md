@@ -91,12 +91,21 @@ Started with:
     *   **Official Company Careers Targeting**: Configured `/api/jobs/search` to pull the new DuckDuckGo Key and run direct query patterns targeting Greenhouse, Lever, and official `*.jobs` career portals, finding opportunities that are not listed on Upwork or LinkedIn.
     *   **Onboarding Setup Fallbacks**: Integrated settings checks on page load to configure warning banners using database configurations instead of relying solely on local storage.
 
+### Phase 10: Unified Branding Layout & Strategic Guide (V11.0)
+*   **Objective**: Resolve layout inconsistencies, introduce a branded Header & Footer globally, apply standard grid background themes, and build an interactive guide containing setup steps and a market strategic gap critique.
+*   **Implementation**:
+    *   **Unified SiteLayout**: Implemented `components/SiteLayout.tsx` providing responsive header navigation and detailed resource categories footer.
+    *   **Root Layout Wrapping**: Integrated `SiteLayout` in `app/layout.tsx` to automatically supply the background grid theme and navigation items globally.
+    *   **Duplicate Navbars Cleanup**: Cleared duplicate logo headers and navigation in `app/page.tsx`, `app/jobs/page.tsx`, `app/simulator/page.tsx`, and `app/admin/page.tsx`.
+    *   **Strategic Guide & Critique `/guide`**: Created a documentation dashboard addressing how the platform operates, how to configure API integrations, and outlining a strategic market fit critique (rating the platform 8/10 and specifying the roadmap to 10/10).
+
 ---
 
 ## 3. Code Modifications & Repository Health
 
 ### Key Enterprise Architectural Shifts
 *   [`prisma/schema.prisma`](file:///careerforge/prisma/schema.prisma): Database definitions for `User`, `CandidateMemory` (with chatLog), `ProofOfWork`, `SessionHistory`, and `CareerChunk`.
+*   [`components/SiteLayout.tsx`](file:///careerforge/components/SiteLayout.tsx): Shared navigation layout rendering headers, footers, and active routes.
 *   [`lib/vector.ts`](file:///careerforge/lib/vector.ts): Hugging Face embedding pipeline and Prisma raw query similarity search engine.
 *   [`app/api/auth/[...nextauth]/route.ts`](file:///careerforge/app/api/auth/[...nextauth]/route.ts): NextAuth.js authentication configuration with credentials and `bcryptjs`.
 *   [`app/actions/memory.ts`](file:///careerforge/actions/memory.ts): Next.js Server Actions connecting the UI components to the Prisma database safely (memory, settings, history, and chat logs).
@@ -104,9 +113,10 @@ Started with:
 *   [`app/builder/page.tsx`](file:///careerforge/app/builder/page.tsx): Redesigned into the TargetMatch Engine, saving results straight to Postgres history.
 *   [`app/profile/page.tsx`](file:///careerforge/app/profile/page.tsx): Candidate profile dashboard reading/writing entirely from/to database actions, adding missing key warnings.
 *   [`app/jobs/page.tsx`](file:///careerforge/app/jobs/page.tsx): Job Hunt Agent interface displaying real-time vacancies, trust/fit analyses, and custom proposal generation modals.
-*   [`app/api/jobs/search/route.ts`](file:///careerforge/api/jobs/search/route.ts): Background agent crawler executing public matches, Tavily API calls, DuckDuckGo free scraper queries, and JSON validation.
+*   [`app/guide/page.tsx`](file:///careerforge/app/guide/page.tsx): Comprehensive interactive usage manual and strategic gap analysis.
+*   [`app/api/jobs/search/route.ts`](file:///careerforge/app/api/jobs/search/route.ts): Background agent crawler executing public matches, Tavily API calls, DuckDuckGo free scraper queries, and JSON validation.
 *   [`app/api/jobs/apply/route.ts`](file:///careerforge/api/jobs/apply/route.ts): Strategic cover letter and proposal builder pulling credentials from Postgres memory.
-*   [`app/api/chat/route.ts`](file:///careerforge/app/api/chat/route.ts): RAG-capable conversation loop that reads candidate context from pgvector chunks.
+*   [`app/api/chat/route.ts`](file:///careerforge/api/chat/route.ts): RAG-capable conversation loop that reads candidate context from pgvector chunks.
 
 ---
 
@@ -157,3 +167,6 @@ Started with:
 ✅ Copy-to-clipboard
 ✅ Modern Dark Mode Vercel Grid UI
 ✅ Responsive design
+✅ Unified branded Header & Footer layout (`/components/SiteLayout.tsx`)
+✅ Global dark grid background theme aligned across all sub-pages
+✅ Documentation and Strategic Critique dashboard (`/guide`)

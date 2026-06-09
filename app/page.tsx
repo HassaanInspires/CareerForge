@@ -6,55 +6,7 @@ export default async function Home() {
   const session = await getServerSession(authOptions);
 
   return (
-    <main className="min-h-screen bg-[var(--color-bg-primary)] text-[var(--color-text-primary)] font-sans relative overflow-hidden">
-      {/* Subtle Grid Background */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
-      
-      {/* Top Nav */}
-      <nav className="relative z-10 flex items-center justify-between p-6 max-w-7xl mx-auto">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-white rounded-md flex items-center justify-center">
-            <span className="text-black font-bold font-mono text-xl">C</span>
-          </div>
-          <span className="text-lg font-bold tracking-tight">CareerForge</span>
-        </div>
-        <div className="flex items-center gap-4">
-          <Link href="/settings" className="text-sm font-medium text-[var(--color-text-secondary)] hover:text-white transition-colors">
-            Settings
-          </Link>
-          
-          {session ? (
-            <>
-              {(session.user as any)?.role === 'ADMIN' && (
-                <Link href="/admin" className="text-sm font-medium text-[var(--color-accent-orange)] hover:text-white transition-colors">
-                  Admin Panel
-                </Link>
-              )}
-              <Link href="/profile" className="text-sm font-medium text-[var(--color-text-secondary)] hover:text-white transition-colors">
-                Profile Hub
-              </Link>
-              <Link href="/jobs" className="text-sm font-medium text-[var(--color-text-secondary)] hover:text-white transition-colors">
-                Job Hunt Agent
-              </Link>
-              <Link href="/simulator" className="text-sm font-medium text-[var(--color-text-secondary)] hover:text-white transition-colors">
-                PoW Simulator
-              </Link>
-              <Link href="/api/auth/signout" className="btn-secondary text-sm px-4 py-2">
-                Sign Out
-              </Link>
-            </>
-          ) : (
-            <>
-              <Link href="/login" className="text-sm font-medium text-[var(--color-text-secondary)] hover:text-white transition-colors">
-                Sign In
-              </Link>
-              <Link href="/register" className="btn-primary text-sm px-4 py-2">
-                Get Started
-              </Link>
-            </>
-          )}
-        </div>
-      </nav>
+    <div className="w-full relative z-10">
 
       {/* Hero Section */}
       <section className="relative z-10 flex flex-col items-center justify-center text-center px-4 pt-32 pb-20 max-w-5xl mx-auto animate-slide-up">
@@ -114,6 +66,6 @@ export default async function Home() {
           </div>
         </div>
       </section>
-    </main>
+    </div>
   );
 }

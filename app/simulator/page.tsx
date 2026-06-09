@@ -138,13 +138,7 @@ export default function SimulatorPage() {
   if (!memory) return null;
 
   return (
-    <div className="min-h-screen bg-[var(--color-bg-primary)] p-6 md:p-12 font-sans relative overflow-x-hidden">
-      <nav className="mb-8 flex justify-between items-center max-w-5xl mx-auto">
-        <Link href="/" className="text-xl font-bold tracking-tight hover:opacity-80">
-          CareerForge <span className="text-[var(--color-accent-purple)] font-mono text-sm ml-2">PoW Simulator</span>
-        </Link>
-        <Link href="/profile" className="text-sm text-[var(--color-text-secondary)] hover:text-white">Back to Profile Hub</Link>
-      </nav>
+    <div className="w-full max-w-5xl mx-auto p-6 md:p-12 font-sans relative">
 
       <main className="max-w-3xl mx-auto animate-fade-in space-y-8">
         <div className="glass-card p-8 border-t-4 border-t-[var(--color-accent-purple)]">

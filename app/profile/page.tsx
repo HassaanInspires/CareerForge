@@ -236,13 +236,10 @@ export default function ProfileHub() {
   if (!memory) return null;
 
   return (
-    <main className="min-h-screen p-4 md:p-8 flex flex-col items-center">
-      <div className="w-full max-w-6xl">
+    <div className="w-full max-w-6xl mx-auto p-4 md:p-8 flex flex-col">
+      <div className="w-full">
         <header className="flex items-center justify-between mb-8 animate-slide-up">
           <div className="flex items-center gap-2">
-            <Link href="/" className="w-10 h-10 rounded-xl flex items-center justify-center btn-primary p-0">
-              <span className="text-white font-heading font-bold text-xl">C</span>
-            </Link>
             <h1 className="text-2xl font-heading font-black text-white tracking-tight">
               Candidate <span className="text-[var(--color-accent-blue)]">Hub</span>
             </h1>
@@ -480,6 +477,6 @@ export default function ProfileHub() {
           </div>
         )}
       </div>
-    </main>
+    </div>
   );
 }

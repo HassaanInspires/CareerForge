@@ -138,20 +138,7 @@ export default function JobAgentPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[var(--color-bg-primary)] p-6 md:p-12 font-sans text-white">
-      <nav className="mb-8 flex justify-between items-center max-w-6xl mx-auto">
-        <div className="flex items-center gap-3">
-          <Link href="/" className="logo-box flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-[var(--color-accent-blue)] to-[var(--color-accent-purple)]">
-            <span className="text-white font-heading font-bold text-xl">C</span>
-          </Link>
-          <h1 className="text-2xl font-heading font-black text-white tracking-tight">
-            Job Hunt <span className="text-[var(--color-accent-purple)]">Agent</span>
-          </h1>
-        </div>
-        <Link href="/profile" className="text-sm text-[var(--color-text-secondary)] hover:text-white">
-          Back to Hub
-        </Link>
-      </nav>
+    <div className="w-full max-w-6xl mx-auto p-6 md:p-12 font-sans text-white">
 
       <main className="max-w-6xl mx-auto space-y-8 animate-fade-in">
         {/* Search Parameter Dashboard */}

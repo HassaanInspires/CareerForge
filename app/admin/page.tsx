@@ -22,13 +22,7 @@ export default async function AdminPage() {
   });
 
   return (
-    <div className="min-h-screen bg-[var(--color-bg-primary)] p-6 md:p-12 font-sans text-white">
-      <nav className="mb-8 flex justify-between items-center max-w-6xl mx-auto">
-        <Link href="/" className="text-xl font-bold tracking-tight hover:opacity-80">
-          CareerForge <span className="text-[var(--color-accent-orange)] font-mono text-sm ml-2">Admin Dashboard</span>
-        </Link>
-        <Link href="/" className="text-sm text-[var(--color-text-secondary)] hover:text-white">Back to App</Link>
-      </nav>
+    <div className="w-full max-w-6xl mx-auto p-6 md:p-12 font-sans text-white">
 
       <main className="max-w-6xl mx-auto space-y-8 animate-fade-in">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

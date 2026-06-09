@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Providers from "@/components/Providers";
+import SiteLayout from "@/components/SiteLayout";
 
 export const metadata: Metadata = {
   title: "CareerForge | AI Resume Optimizer",
@@ -19,8 +20,9 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col text-white font-sans relative">
         <Providers>
-          <div className="doodles-overlay"></div>
-          {children}
+          <SiteLayout>
+            {children}
+          </SiteLayout>
         </Providers>
       </body>
     </html>
