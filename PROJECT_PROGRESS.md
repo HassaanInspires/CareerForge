@@ -113,6 +113,13 @@ Started with:
     *   **Manual Trigger Action**: Coded the `handleAnalyzeCV` caller to request profile parsing dynamically using database-stored PDF base64 contents.
     *   **Interactive Controls**: Added a "Fetch Details" button to the active resume card and instant extraction links on empty metrics and skills states.
 
+### Phase 13: Extraction Feedback & Clarification Modal (V13.2)
+*   **Objective**: Expose previously hidden extraction errors (e.g., invalid models, missing keys) to the user, add a success confirmation state, and implement an interactive post-extraction pop-up.
+*   **Implementation**:
+    *   **Error Exposer**: Conditionally rendered `{error}` strings inside the active resume panel so the user can immediately diagnose missing config setups.
+    *   **Success Banners**: Added a dismissible green light success message.
+    *   **Clarification Modal**: Built an interactive modal that intercepts the user upon extraction completion, feeding custom choices ("Yes, let's refine my profile") directly into the Memory Manager chat.
+
 ---
 
 ## 3. Code Modifications & Repository Health
@@ -189,3 +196,6 @@ Started with:
 ✅ Automatic DB-backed settings synchronization for profile onboarding and chat
 ✅ Manual "Fetch Details" CV extraction trigger button
 ✅ Direct interactive extraction triggers for empty memory stats (skills, metrics)
+✅ Visible extraction error banner reporting
+✅ Green light extraction success banner
+✅ Interactive Post-Extraction Clarification Modal

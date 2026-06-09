@@ -27,6 +27,8 @@ export default function ProfileHub() {
   const [memory, setMemory] = useState<CandidateMemory | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+  const [showClarification, setShowClarification] = useState(false);
   const [hasResume, setHasResume] = useState(false);
   const [chatInput, setChatInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -116,6 +118,7 @@ export default function ProfileHub() {
 
     setIsUploading(true);
     setError('');
+    setSuccessMsg('');
 
     const reader = new FileReader();
     reader.onload = async () => {
@@ -158,6 +161,8 @@ export default function ProfileHub() {
         const welcomeLog = [{ role: 'ai' as const, content: 'Hello! I have analyzed your CV and initialized your career memory graph. What would you like to discuss or refine?' }];
         setChatLog(welcomeLog);
         await saveUserChatLog(welcomeLog);
+        setSuccessMsg('Successfully extracted details from CV!');
+        setShowClarification(true);
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -184,6 +189,7 @@ export default function ProfileHub() {
 
     setIsUploading(true);
     setError('');
+    setSuccessMsg('');
 
     try {
       const res = await fetch('/api/onboard', {
@@ -207,6 +213,8 @@ export default function ProfileHub() {
       const welcomeLog = [{ role: 'ai' as const, content: 'Hello! I have manually re-analyzed your CV and updated your career memory graph. What would you like to discuss or refine?' }];
       setChatLog(welcomeLog);
       await saveUserChatLog(welcomeLog);
+      setSuccessMsg('Successfully extracted details from CV!');
+      setShowClarification(true);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -259,6 +267,51 @@ export default function ProfileHub() {
       await saveUserChatLog(errorChatLog);
     } finally {
       setIsTyping(false);
+    }
+  };
+
+  const handleModalChoice = async (choice: 'yes' | 'no') => {
+    setShowClarification(false);
+    if (choice === 'yes') {
+      const userMsg = "Yes, let's review my missing gaps and define my target goals.";
+      const nextChatLog = [...chatLog, { role: 'user' as const, content: userMsg }];
+      setChatLog(nextChatLog);
+      setIsTyping(true);
+
+      try {
+        await saveUserChatLog(nextChatLog);
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: nextChatLog,
+            jobDescription: 'Updating Candidate Profile without a specific job description yet.',
+            memory: memory,
+            provider: activeProvider,
+            model: activeModel,
+            userApiKey: apiKey,
+            realism
+          })
+        });
+
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+
+        if (data.memory) {
+          setMemory(data.memory);
+          await saveUserMemory(data.memory);
+        }
+
+        const finalChatLog = [...nextChatLog, { role: 'ai' as const, content: data.response }];
+        setChatLog(finalChatLog);
+        await saveUserChatLog(finalChatLog);
+      } catch (err: any) {
+        const errorChatLog = [...nextChatLog, { role: 'ai' as const, content: 'Error: ' + err.message }];
+        setChatLog(errorChatLog);
+        await saveUserChatLog(errorChatLog);
+      } finally {
+        setIsTyping(false);
+      }
     }
   };
 
@@ -448,6 +501,19 @@ export default function ProfileHub() {
                   />
                 </div>
               </div>
+
+              {/* Feedback Banners */}
+              {error && (
+                <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm animate-fade-in font-mono">
+                  ⚠️ {error}
+                </div>
+              )}
+              {successMsg && (
+                <div className="p-4 rounded-lg bg-[var(--color-success)]/10 border border-[var(--color-success)]/20 text-[var(--color-success)] text-sm animate-fade-in font-mono flex items-center justify-between">
+                  <span>✅ {successMsg}</span>
+                  <button onClick={() => setSuccessMsg('')} className="text-[var(--color-success)] hover:text-white">✕</button>
+                </div>
+              )}
 
               <div className="glass-card p-6 border-t-4 border-t-[var(--color-accent-blue)]">
                 <div className="flex justify-between items-start mb-6">
@@ -663,6 +729,33 @@ export default function ProfileHub() {
           </div>
         )}
       </div>
+
+      {/* Clarification Modal */}
+      {showClarification && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+          <div className="glass-card max-w-md w-full p-6 animate-scale-in">
+            <h3 className="text-xl font-bold text-white mb-2">Extraction Complete ✅</h3>
+            <p className="text-sm text-[var(--color-text-secondary)] mb-6">
+              I've successfully processed your Master CV. Would you like to review your missing gaps and refine your target goals now?
+            </p>
+            
+            <div className="space-y-3">
+              <button 
+                onClick={() => handleModalChoice('yes')}
+                className="w-full btn-primary py-3 font-mono"
+              >
+                Yes, let's refine my profile
+              </button>
+              <button 
+                onClick={() => handleModalChoice('no')}
+                className="w-full btn-secondary py-3 font-mono"
+              >
+                No, it looks good for now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
