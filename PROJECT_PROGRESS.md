@@ -58,6 +58,23 @@ Started with:
     *   **Semantic RAG Chat & Match**: Connected route handlers to run cosine similarity queries, injecting matching chunks dynamically into the LLM prompt.
     *   **Full Database Session Sync**: Migrated all chat histories and builder match archives to database-backed persistent tables.
 
+### Phase 6: Agentic Job Matcher & Authenticity Validator (V7.0)
+*   **Objective**: Allow real-time search of actual job openings, automatically verify job trust ratings to filter fake companies, calculate match compatibility fit, and prevent upload failures from unconfigured API keys.
+*   **Implementation**:
+    *   **Onboarding Setup Guards**: Integrated proactive warning banners in `/profile` when LLM provider keys are missing in localStorage, preventing silent processing failures.
+    *   **Crawlers & Search Engines**: Implemented `/api/jobs/search` querying real-time free job streams (Remotive & Arbeitnow) matching user keywords and locations.
+    *   **AI Authenticity Trust Engine**: Built an evaluation agent checking the listing's specifications against fake/spam indicators and generating a Company Trust Score (%).
+    *   **Fit Score Roster**: Displays ATS compatibility percentages showing matching and missing skills compared to the user's permanent Postgres graph memory.
+
+### Phase 7: Freelancer & LinkedIn Deep Search & Application Strategy Builder (V8.0)
+*   **Objective**: Search freelance platforms (Upwork, Fiverr, Freelancer) and LinkedIn, search official company portals directly, and build personalized pitches/proposals with salary negotiation tips.
+*   **Implementation**:
+    *   **Tavily Search API**: Added input support in `/settings` to store a free Tavily Search API Key.
+    *   **Free DuckDuckGo HTML Scraper**: Engineered an unauthenticated scraping parser to scrape DuckDuckGo search results for free if no Tavily key is entered.
+    *   **Freelance Site targeting**: Constructors generate specific `site:` search queries, finding matches across LinkedIn, Upwork, Fiverr, and Freelancer.
+    *   **Pitch & Proposal strategy endpoint (`/api/jobs/apply`)**: A server handler that pulls candidate memory from Postgres, compares it to the job description, and generates customized pitches, salary negotiations, attachments lists, and checklist prep plans.
+    *   **Proposal Modal Dashboard**: Designed a modal window on `/jobs` rendering custom cover letters, rate strategies, and attachments with copy buttons.
+
 ---
 
 ## 3. Code Modifications & Repository Health
@@ -69,7 +86,10 @@ Started with:
 *   [`app/actions/memory.ts`](file:///careerforge/actions/memory.ts): Next.js Server Actions connecting the UI components to the Prisma database safely (memory, history, and chat logs).
 *   [`app/admin/page.tsx`](file:///careerforge/app/admin/page.tsx): Secure server-side rendered Admin dashboard to monitor platform usage.
 *   [`app/builder/page.tsx`](file:///careerforge/app/builder/page.tsx): Redesigned into the TargetMatch Engine, saving results straight to Postgres history.
-*   [`app/profile/page.tsx`](file:///careerforge/app/profile/page.tsx): Candidate profile dashboard reading/writing entirely from/to database actions.
+*   [`app/profile/page.tsx`](file:///careerforge/app/profile/page.tsx): Candidate profile dashboard reading/writing entirely from/to database actions, adding missing key warnings.
+*   [`app/jobs/page.tsx`](file:///careerforge/app/jobs/page.tsx): Job Hunt Agent interface displaying real-time vacancies, trust/fit analyses, and custom proposal generation modals.
+*   [`app/api/jobs/search/route.ts`](file:///careerforge/api/jobs/search/route.ts): Background agent crawler executing public matches, Tavily API calls, DuckDuckGo free scraper queries, and JSON validation.
+*   [`app/api/jobs/apply/route.ts`](file:///careerforge/app/api/jobs/apply/route.ts): Strategic cover letter and proposal builder pulling credentials from Postgres memory.
 *   [`app/api/chat/route.ts`](file:///careerforge/app/api/chat/route.ts): RAG-capable conversation loop that reads candidate context from pgvector chunks.
 
 ---
@@ -91,6 +111,10 @@ Started with:
 *   **Challenge**: Encountered schema validation errors due to differences between Prisma versions and Next.js Turbopack compiler.
 *   **Solution**: Standardized on Prisma v5 with proper database URL injection and ran targeted schema generation during build time.
 
+### 5. Offline & Containerized Font Resolution Issues
+*   **Challenge**: The Next.js build compilation failed inside restricted internet environment due to Google Font fetch failures inside `next/font/google`.
+*   **Solution**: Bypassed compile-time Google Font fetching by migrating font imports directly into `app/globals.css` with native system fallback stacks, allowing Next.js to build offline successfully.
+
 ---
 
 ## 5. Current State (Enterprise Verification Engine Complete)
@@ -107,6 +131,12 @@ Started with:
 ✅ Advanced Semantic Scoring (ATS Parsability, Impact Density, Keyword Match)
 ✅ Interactive Post-Generation AI Refinement Chat
 ✅ Adjustable AI Coaching Realism setting (Brutal Realism vs Supportive Coaching)
+✅ Agentic Job Matcher & Authenticity Validator dashboard (/jobs)
+✅ Live Remotive & Arbeitnow crawlers without custom search API fees
+✅ Tavily Deep Search Integration + unauthenticated DuckDuckGo scraper fallback
+✅ Freelance (Upwork, Fiverr, Freelancer) and LinkedIn deep targeting
+✅ AI Proposal & Tailored Application Pitch strategy builder (/api/jobs/apply)
+✅ Google Font offline compilation compile-time bypass
 ✅ Copy-to-clipboard
 ✅ Modern Dark Mode Vercel Grid UI
 ✅ Responsive design

@@ -1,29 +1,6 @@
 import type { Metadata } from "next";
-import { Space_Mono, IBM_Plex_Mono, Sora, Inter } from "next/font/google";
 import "./globals.css";
 import Providers from "@/components/Providers";
-
-const spaceMono = Space_Mono({
-  weight: ["400", "700"],
-  subsets: ["latin"],
-  variable: "--font-space-mono",
-});
-
-const ibmPlexMono = IBM_Plex_Mono({
-  weight: ["400", "500", "600", "700"],
-  subsets: ["latin"],
-  variable: "--font-ibm-plex-mono",
-});
-
-const sora = Sora({
-  subsets: ["latin"],
-  variable: "--font-sora",
-});
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-});
 
 export const metadata: Metadata = {
   title: "CareerForge | AI Resume Optimizer",
@@ -38,7 +15,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${spaceMono.variable} ${ibmPlexMono.variable} ${sora.variable} ${inter.variable} h-full antialiased`}
+      className="h-full antialiased"
     >
       <body className="min-h-full flex flex-col text-white font-sans relative">
         <Providers>

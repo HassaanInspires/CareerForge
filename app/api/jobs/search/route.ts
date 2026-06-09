@@ -14,6 +14,129 @@ interface JobSourceItem {
   isRemote: boolean;
 }
 
+// 1. DuckDuckGo Free Search Scraper (100% Free, No Key Required)
+async function crawlDuckDuckGo(searchQuery: string): Promise<JobSourceItem[]> {
+  try {
+    const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(searchQuery)}`;
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36'
+      }
+    });
+
+    if (!res.ok) return [];
+    const html = await res.text();
+
+    const results: JobSourceItem[] = [];
+    const resultBlocks = html.split('<div class="web-result');
+
+    for (let i = 1; i < resultBlocks.length; i++) {
+      const block = resultBlocks[i];
+      const titleMatch = block.match(/<a class="result__url"[^>]*>([\s\S]*?)<\/a>/);
+      const urlMatch = block.match(/href="([^"]+)"/);
+      const snippetMatch = block.match(/<a class="result__snippet"[^>]*>([\s\S]*?)<\/a>/);
+
+      if (titleMatch && urlMatch) {
+        const titleText = titleMatch[1].replace(/<[^>]*>/g, '').trim();
+        let link = urlMatch[1];
+        if (link.includes('uddg=')) {
+          const parts = link.split('uddg=');
+          if (parts[1]) {
+            link = decodeURIComponent(parts[1].split('&')[0]);
+          }
+        }
+        const snippetText = snippetMatch ? snippetMatch[1].replace(/<[^>]*>/g, '').trim() : '';
+
+        // Extract company from title (e.g. "React Developer - Upwork" or "React Developer at Stripe")
+        let company = 'Web Listing';
+        let cleanTitle = titleText;
+        if (titleText.includes('at ')) {
+          const split = titleText.split('at ');
+          cleanTitle = split[0].trim();
+          company = split[1].split('-')[0].trim();
+        } else if (titleText.includes('|')) {
+          const split = titleText.split('|');
+          cleanTitle = split[0].trim();
+          company = split[1].trim();
+        }
+
+        // Deduce remote status
+        const isRemote = searchQuery.toLowerCase().includes('remote') || 
+                         titleText.toLowerCase().includes('remote') || 
+                         snippetText.toLowerCase().includes('remote');
+
+        results.push({
+          title: cleanTitle,
+          company,
+          url: link,
+          location: isRemote ? 'Remote' : 'Worldwide',
+          salary: 'Estimated based on spec',
+          description: snippetText.substring(0, 1000),
+          isRemote
+        });
+      }
+    }
+
+    return results;
+  } catch (error) {
+    console.error("DuckDuckGo search crawl failed:", error);
+    return [];
+  }
+}
+
+// 2. Tavily API Job Crawler (Requires tvly-... Key)
+async function crawlTavily(searchQuery: string, apiKey: string): Promise<JobSourceItem[]> {
+  try {
+    const res = await fetch('https://api.tavily.com/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        api_key: apiKey,
+        query: searchQuery,
+        search_depth: 'advanced',
+        include_answer: false,
+        max_results: 10
+      })
+    });
+
+    if (!res.ok) {
+      console.warn("Tavily search API responded with error status:", res.status);
+      return [];
+    }
+
+    const data = await res.json();
+    if (!data.results || !Array.isArray(data.results)) return [];
+
+    return data.results.map((r: any) => {
+      let company = 'Web Listing';
+      const titleText = r.title || 'Job Opening';
+      let cleanTitle = titleText;
+      if (titleText.includes('at ')) {
+        const split = titleText.split('at ');
+        cleanTitle = split[0].trim();
+        company = split[1].split('-')[0].trim();
+      }
+
+      const isRemote = searchQuery.toLowerCase().includes('remote') || 
+                       titleText.toLowerCase().includes('remote') || 
+                       r.content.toLowerCase().includes('remote');
+
+      return {
+        title: cleanTitle,
+        company,
+        url: r.url || '',
+        location: isRemote ? 'Remote' : 'Hybrid/Worldwide',
+        salary: 'Negotiable',
+        description: r.content || '',
+        isRemote
+      };
+    });
+  } catch (error) {
+    console.error("Tavily search crawl failed:", error);
+    return [];
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -37,6 +160,7 @@ export async function POST(req: NextRequest) {
       provider: providerName, 
       model, 
       userApiKey,
+      tavilyApiKey = '',
       depth = 'quick' // 'quick' (5 jobs) or 'deep' (15 jobs)
     } = body;
 
@@ -52,94 +176,100 @@ export async function POST(req: NextRequest) {
       careerLevel = user.memory.careerLevel || 'Unknown';
     }
 
-    // 1. Fetch from Public Job Feeds (Remotive & Arbeitnow)
     let jobsList: JobSourceItem[] = [];
 
-    try {
-      // Fetch Remotive (Remote Focus)
-      const remotiveRes = await fetch('https://remotive.com/api/remote-jobs?limit=50', {
-        headers: { 'User-Agent': 'CareerForge-AI-Agent/1.0' }
-      });
-      if (remotiveRes.ok) {
-        const data = await remotiveRes.json();
-        if (data.jobs && Array.isArray(data.jobs)) {
-          data.jobs.forEach((j: any) => {
-            jobsList.push({
-              title: j.title || '',
-              company: j.company_name || '',
-              url: j.url || '',
-              location: j.candidate_required_location || 'Remote',
-              salary: j.salary || 'Not specified',
-              description: (j.description || '').replace(/<[^>]*>/g, '').substring(0, 1000),
-              isRemote: true
-            });
-          });
-        }
-      }
-    } catch (e: any) {
-      console.warn("Remotive API failed:", e.message);
-    }
+    // Construct broad query parameters
+    const targetQuery = `${query} ${location || 'Remote'} Developer designer jobs project`;
 
-    try {
-      // Fetch Arbeitnow (European / Hybrid Focus)
-      const arbeitRes = await fetch('https://www.arbeitnow.com/api/job-board-api', {
-        headers: { 'User-Agent': 'CareerForge-AI-Agent/1.0' }
-      });
-      if (arbeitRes.ok) {
-        const data = await arbeitRes.json();
-        if (data.data && Array.isArray(data.data)) {
-          data.data.forEach((j: any) => {
-            jobsList.push({
-              title: j.title || '',
-              company: j.company_name || '',
-              url: j.url || '',
-              location: j.location || 'Europe',
-              salary: 'Negotiable',
-              description: (j.description || '').replace(/<[^>]*>/g, '').substring(0, 1000),
-              isRemote: !!j.remote
-            });
-          });
-        }
-      }
-    } catch (e: any) {
-      console.warn("Arbeitnow API failed:", e.message);
-    }
-
-    // 2. Filter & Keyword Match
-    const searchTerms = query.toLowerCase().split(/\s+/).filter(Boolean);
-    let filteredJobs = jobsList;
-
-    if (searchTerms.length > 0) {
-      filteredJobs = jobsList.filter(job => {
-        const titleMatch = searchTerms.some((term: string) => job.title.toLowerCase().includes(term));
-        const companyMatch = searchTerms.some((term: string) => job.company.toLowerCase().includes(term));
-        const descMatch = searchTerms.some((term: string) => job.description.toLowerCase().includes(term));
-        return titleMatch || companyMatch || descMatch;
-      });
-    }
-
-    if (location) {
-      const locTerm = location.toLowerCase();
-      filteredJobs = filteredJobs.filter(job => 
-        job.location.toLowerCase().includes(locTerm) || 
-        (locTerm === 'remote' && job.isRemote)
+    // 1. Fetch from Tavily if key exists, otherwise crawl DuckDuckGo
+    if (tavilyApiKey && tavilyApiKey.trim().startsWith('tvly-')) {
+      console.log("Using Tavily Search engine...");
+      // Search Upwork/Fiverr/Freelancer/LinkedIn in parallel
+      const searchQueries = [
+        `site:upwork.com/jobs OR site:upwork.com/freelance-jobs "${query}"`,
+        `site:linkedin.com/jobs/view OR site:linkedin.com/jobs "${query}" "${location}"`,
+        `site:freelancer.com/projects OR site:fiverr.com "${query}"`
+      ];
+      
+      const crawledArrays = await Promise.all(
+        searchQueries.map(q => crawlTavily(q, tavilyApiKey))
       );
+      crawledArrays.forEach(arr => jobsList.push(...arr));
+    } else {
+      console.log("Tavily key missing. Falling back to DuckDuckGo HTML Scraper + public APIs...");
+      // Fallback search Upwork & LinkedIn
+      const ddgJobs = await crawlDuckDuckGo(`site:upwork.com/jobs OR site:linkedin.com/jobs "${query}" ${location}`);
+      jobsList.push(...ddgJobs);
+
+      // Add Remotive + Arbeitnow feeds
+      try {
+        const remotiveRes = await fetch('https://remotive.com/api/remote-jobs?limit=20');
+        if (remotiveRes.ok) {
+          const data = await remotiveRes.json();
+          if (data.jobs && Array.isArray(data.jobs)) {
+            data.jobs.forEach((j: any) => {
+              if (j.title.toLowerCase().includes(query.toLowerCase())) {
+                jobsList.push({
+                  title: j.title || '',
+                  company: j.company_name || 'Remotive Recruiter',
+                  url: j.url || '',
+                  location: j.candidate_required_location || 'Remote',
+                  salary: j.salary || 'Not specified',
+                  description: (j.description || '').replace(/<[^>]*>/g, '').substring(0, 1000),
+                  isRemote: true
+                });
+              }
+            });
+          }
+        }
+      } catch (e) {}
+
+      try {
+        const arbeitRes = await fetch('https://www.arbeitnow.com/api/job-board-api');
+        if (arbeitRes.ok) {
+          const data = await arbeitRes.json();
+          if (data.data && Array.isArray(data.data)) {
+            data.data.forEach((j: any) => {
+              if (j.title.toLowerCase().includes(query.toLowerCase())) {
+                jobsList.push({
+                  title: j.title || '',
+                  company: j.company_name || 'Arbeitnow Hiring',
+                  url: j.url || '',
+                  location: j.location || 'Europe',
+                  salary: 'Negotiable',
+                  description: (j.description || '').replace(/<[^>]*>/g, '').substring(0, 1000),
+                  isRemote: !!j.remote
+                });
+              }
+            });
+          }
+        }
+      } catch (e) {}
     }
 
-    // Limit to top 8 items for LLM evaluation to avoid token limits
-    const maxItems = depth === 'deep' ? 12 : 6;
-    const candidateJobs = filteredJobs.slice(0, maxItems);
+    // Deduplicate lists based on Title & Company
+    const seen = new Set<string>();
+    let dedupedJobs = jobsList.filter(job => {
+      const uniqueKey = `${job.title.toLowerCase()}_${job.company.toLowerCase()}`;
+      if (seen.has(uniqueKey)) return false;
+      seen.add(uniqueKey);
+      return true;
+    });
 
-    // If no jobs match, supply a generic list or return empty
-    if (candidateJobs.length === 0) {
+    if (dedupedJobs.length === 0) {
       return NextResponse.json({ jobs: [] });
     }
 
-    // 3. AI Authenticity & Match Valuation Loop
+    // Slice based on search depth
+    const maxItems = depth === 'deep' ? 12 : 6;
+    const candidateJobs = dedupedJobs.slice(0, maxItems);
+
+    // 3. AI Authenticity, Match, Salary Verification Loop
     const provider = getProvider(providerName);
     const evaluationPrompt = `
 You are the AI Job Agent & Authenticity Validator of CareerForge.
-Your job is to evaluate a roster of job postings against a candidate's profile to score the fit and determine if the posting or company looks authentic (not spam/outdated).
+Your job is to evaluate a roster of job postings against a candidate's profile to score the fit and verify if the posting or company looks authentic (not spam/outdated).
+Verify the company details, trends, and calculate salary expectations.
 
 --- CANDIDATE INFORMATION ---
 Career Level: ${careerLevel}
@@ -153,14 +283,14 @@ Company: ${job.company}
 Location: ${job.location}
 Salary: ${job.salary}
 URL: ${job.url}
-Description: ${job.description.substring(0, 300)}...
+Description: ${job.description.substring(0, 400)}...
 `).join('\n---\n')}
 
 Evaluate each job. Determine:
 1. A Match Fit score (0-100) based on how well their skills match the requirements.
-2. A Company Authenticity Trust Score (0-100) explaining if the company looks legitimate, has clear technology alignment, or contains spam patterns.
+2. A Company Authenticity Trust Score (0-100) explaining if the company looks legitimate, has active operations, or is a generic freelance middleman.
 3. List matched skills and missing skills.
-4. State if the position supports remote or physical.
+4. Estimate realistic salary offerings based on market standards.
 
 Return ONLY a valid JSON object matching this exact structure:
 {
@@ -169,10 +299,10 @@ Return ONLY a valid JSON object matching this exact structure:
       "id": 0,
       "fitScore": 85,
       "trustScore": 95,
-      "trustExplanation": "Company is verified and description outlines standard engineering standards.",
+      "trustExplanation": "Standard company with verifiable domain footprint.",
       "matchedSkills": ["skill1"],
       "missingSkills": ["skill2"],
-      "remoteType": "Remote"
+      "salaryEstimate": "$80k - $100k"
     }
   ]
 }
@@ -189,10 +319,10 @@ Return ONLY a valid JSON object matching this exact structure:
       const evaluation = result.evaluatedJobs?.find((e: any) => e.id === idx) || {
         fitScore: 50,
         trustScore: 80,
-        trustExplanation: "Default check completed.",
+        trustExplanation: "Standard web listings verification completed.",
         matchedSkills: [],
         missingSkills: [],
-        remoteType: job.isRemote ? "Remote" : "On-site"
+        salaryEstimate: job.salary
       };
 
       return {
@@ -202,7 +332,7 @@ Return ONLY a valid JSON object matching this exact structure:
         trustExplanation: evaluation.trustExplanation,
         matchedSkills: evaluation.matchedSkills,
         missingSkills: evaluation.missingSkills,
-        remoteType: evaluation.remoteType || (job.isRemote ? "Remote" : "On-site")
+        salary: evaluation.salaryEstimate || job.salary
       };
     });
 

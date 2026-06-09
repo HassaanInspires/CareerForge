@@ -31,6 +31,17 @@ export default function JobAgentPage() {
   const [error, setError] = useState<string | null>(null);
   const [hasKeys, setHasKeys] = useState(true);
 
+  // Proposal Builder States
+  const [proposalJob, setProposalJob] = useState<Job | null>(null);
+  const [proposalData, setProposalData] = useState<{
+    proposal: string;
+    requiredAttachments: string[];
+    salaryNegotiation: string;
+    checklist: string[];
+  } | null>(null);
+  const [isGeneratingProposal, setIsGeneratingProposal] = useState(false);
+  const [proposalError, setProposalError] = useState<string | null>(null);
+
   useEffect(() => {
     if (status === 'unauthenticated') {
       window.location.href = '/login';
@@ -56,6 +67,7 @@ export default function JobAgentPage() {
     const provider = localStorage.getItem('cf_provider') as Provider || 'anthropic';
     const apiKey = localStorage.getItem(`cf_key_${provider}`) || '';
     const model = localStorage.getItem(`cf_model_${provider}`) || '';
+    const tavilyKey = localStorage.getItem('cf_tavily_key') || '';
 
     try {
       const res = await fetch('/api/jobs/search', {
@@ -67,7 +79,8 @@ export default function JobAgentPage() {
           depth,
           provider,
           model,
-          userApiKey: apiKey
+          userApiKey: apiKey,
+          tavilyApiKey: tavilyKey
         })
       });
 
@@ -79,6 +92,42 @@ export default function JobAgentPage() {
       setError(err.message);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleGenerateProposal = async (job: Job) => {
+    setProposalJob(job);
+    setIsGeneratingProposal(true);
+    setProposalError(null);
+    setProposalData(null);
+
+    const provider = localStorage.getItem('cf_provider') || 'anthropic';
+    const apiKey = localStorage.getItem(`cf_key_${provider}`) || '';
+    const model = localStorage.getItem(`cf_model_${provider}`) || '';
+
+    try {
+      const res = await fetch('/api/jobs/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: job.title,
+          company: job.company,
+          url: job.url,
+          description: job.description,
+          salary: job.salary,
+          provider,
+          model,
+          userApiKey: apiKey
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to generate proposal');
+      setProposalData(data);
+    } catch (err: any) {
+      setProposalError(err.message);
+    } finally {
+      setIsGeneratingProposal(false);
     }
   };
 
@@ -250,16 +299,24 @@ export default function JobAgentPage() {
                   </div>
 
                   <div>
-                    <div className="flex justify-between items-center pt-4 border-t border-[var(--color-border-light)]">
-                      <span className="text-xs font-mono text-[var(--color-text-disabled)]">Offer: {job.salary}</span>
-                      <a
-                        href={job.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn-primary py-1.5 px-4 text-xs font-bold bg-[var(--color-accent-blue)] text-white hover:opacity-90 flex items-center gap-1"
+                    <div className="flex flex-col gap-2 pt-4 border-t border-[var(--color-border-light)]">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-mono text-[var(--color-text-disabled)]">Offer: {job.salary}</span>
+                        <a
+                          href={job.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-[var(--color-accent-blue)] underline hover:text-white"
+                        >
+                          View Official Link ↗
+                        </a>
+                      </div>
+                      <button
+                        onClick={() => handleGenerateProposal(job)}
+                        className="btn-primary py-2 px-4 text-xs font-bold bg-gradient-to-r from-[var(--color-accent-blue)] to-[var(--color-accent-purple)] text-white hover:opacity-90 flex items-center justify-center gap-1 mt-2"
                       >
-                        Apply & Verify Fit <span className="text-[var(--color-success)]">✓</span>
-                      </a>
+                        Generate Pitch & Proposal Strategy ⚡
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -272,6 +329,114 @@ export default function JobAgentPage() {
           </div>
         )}
       </main>
+
+      {/* Proposal Generator Modal */}
+      {proposalJob && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="glass-card max-w-3xl w-full p-8 space-y-6 max-h-[90vh] overflow-y-auto border border-[var(--color-border-medium)]">
+            <div className="flex justify-between items-start">
+              <div>
+                <h3 className="text-xl font-heading font-black text-white">
+                  Application Strategy & Pitch Builder
+                </h3>
+                <p className="text-sm text-[var(--color-text-secondary)] mt-1">
+                  Custom-tailored approach for {proposalJob.title} at {proposalJob.company}
+                </p>
+              </div>
+              <button
+                onClick={() => setProposalJob(null)}
+                className="text-2xl text-[var(--color-text-disabled)] hover:text-white"
+              >
+                &times;
+              </button>
+            </div>
+
+            {isGeneratingProposal ? (
+              <div className="text-center py-12 space-y-4">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[var(--color-accent-blue)] mx-auto"></div>
+                <p className="text-sm text-[var(--color-text-secondary)]">
+                  Drafting customized freelance proposal/cover letter matching your Proof-of-Work portfolio...
+                </p>
+              </div>
+            ) : proposalError ? (
+              <div className="p-4 rounded bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                Error generating application pitch: {proposalError}
+              </div>
+            ) : proposalData ? (
+              <div className="space-y-6 animate-fade-in text-sm leading-relaxed">
+                {/* Tailored Cover Letter / Proposal */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <h4 className="text-xs uppercase font-bold tracking-wider text-[var(--color-accent-blue)]">
+                      Tailored Cover Letter / Upwork Proposal
+                    </h4>
+                    <button
+                      onClick={() => navigator.clipboard.writeText(proposalData.proposal)}
+                      className="text-xs text-[var(--color-text-secondary)] hover:text-white border border-[var(--color-border-light)] px-2.5 py-1 rounded bg-[var(--color-bg-secondary)]"
+                    >
+                      Copy Pitch 📋
+                    </button>
+                  </div>
+                  <pre className="p-4 rounded bg-[var(--color-bg-secondary)] border border-[var(--color-border-light)] font-sans text-xs whitespace-pre-wrap leading-relaxed text-[var(--color-text-primary)]">
+                    {proposalData.proposal}
+                  </pre>
+                </div>
+
+                {/* Salary Negotiation Strategy */}
+                <div className="space-y-2">
+                  <h4 className="text-xs uppercase font-bold tracking-wider text-[var(--color-accent-orange)]">
+                    Salary & Rate Negotiation Strategy
+                  </h4>
+                  <div className="p-4 rounded bg-[var(--color-bg-secondary)] border border-[var(--color-border-light)] text-xs text-[var(--color-text-secondary)]">
+                    {proposalData.salaryNegotiation}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Required Attachments */}
+                  <div className="space-y-2">
+                    <h4 className="text-xs uppercase font-bold tracking-wider text-[var(--color-success)]">
+                      Suggested Attachments / Links
+                    </h4>
+                    <ul className="space-y-1.5 text-xs text-[var(--color-text-secondary)]">
+                      {proposalData.requiredAttachments.map((att, idx) => (
+                        <li key={idx} className="flex items-start gap-1.5">
+                          <span className="text-[var(--color-success)]">📎</span>
+                          <span>{att}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Skills Preparation Checklist */}
+                  <div className="space-y-2">
+                    <h4 className="text-xs uppercase font-bold tracking-wider text-[var(--color-error)]">
+                      Interview/Project Prep Checklist
+                    </h4>
+                    <ul className="space-y-1.5 text-xs text-[var(--color-text-secondary)]">
+                      {proposalData.checklist.map((item, idx) => (
+                        <li key={idx} className="flex items-start gap-1.5">
+                          <span className="text-[var(--color-error)]">⚡</span>
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-4 border-t border-[var(--color-border-light)]">
+                  <button
+                    onClick={() => setProposalJob(null)}
+                    className="btn-secondary py-2 px-6"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

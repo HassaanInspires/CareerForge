@@ -9,13 +9,14 @@ Recruiters don't trust resumes anymore because Generative AI has made it effortl
 We build an "Employer Brief" that proves what a candidate can do through data, not adjectives.
 1. **The Profile Hub:** Connect GitHub and run automated 10-minute AI technical challenges. Your verified skills and artifacts are securely logged to the database.
 2. **The TargetMatch Engine:** Paste a target Job Description. Our AI fetches your Verified Graph and outputs a Brutal Reality Check. It highlights exactly where your *provable* skills match the job, and where you fall short.
+3. **The Job Hunt Agent:** Search for remote and physical job listings, freelance platforms (Upwork, Fiverr, Freelancer), and LinkedIn in real time. The agent queries open job feeds, evaluates listings for authenticity to weed out fake companies, generates an ATS compatibility score, and builds custom freelance pitches/cover letters detailing salary justifications and prep checklists.
 
 ## Tech Stack
 - **Framework:** Next.js 16 (App Router)
 - **Database:** Supabase PostgreSQL with `pgvector` extension via Prisma ORM
 - **Authentication:** NextAuth.js with bcryptjs
-- **Styling:** Vanilla CSS (`index.css`) & CSS Modules
-- **AI & Embedding Integration:** Hugging Face Inference (`all-MiniLM-L6-v2`) for vector embeddings, alongside support for Anthropic, OpenAI, Mistral, xAI.
+- **Styling:** Vanilla CSS (`globals.css`) & CSS Modules. Google Fonts are imported directly in CSS to allow 100% offline development compiling without `next/font/google` connection failures.
+- **AI & Embedding Integration:** Hugging Face Inference (`all-MiniLM-L6-v2`) for vector embeddings, alongside support for Anthropic, OpenAI, Mistral, xAI. Tavily API can be configured in settings to run deep searches on LinkedIn and Freelance boards (with a built-in unauthenticated DuckDuckGo scraper fallback).
 
 ## Getting Started
 
@@ -27,6 +28,10 @@ npm install
 Set up your database:
 ```bash
 npx prisma generate
+```
+
+To deploy/test the database schema locally or in production:
+```bash
 npx prisma db push
 ```
 
@@ -35,4 +40,4 @@ Run the development server:
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result. You must register an account to access the Profile Hub and Verification tools. Admin users can access `/admin` to view platform analytics.
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result. You must register an account to access the Profile Hub and Verification tools. Admin users can access `/admin` to view platform analytics. Configuration for Tavily Search can be updated via the `/settings` route.

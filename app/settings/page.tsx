@@ -11,6 +11,7 @@ export default function SettingsPage() {
   const [isFetching, setIsFetching] = useState<{ [key: string]: boolean }>({});
   const [saved, setSaved] = useState(false);
   const [realism, setRealism] = useState('brutal');
+  const [tavilyKey, setTavilyKey] = useState('');
 
   const providers = [
     { id: 'anthropic', name: 'Anthropic' },
@@ -27,6 +28,9 @@ export default function SettingsPage() {
 
     const savedRealism = localStorage.getItem('cf_ai_realism');
     if (savedRealism) setRealism(savedRealism);
+
+    const savedTavily = localStorage.getItem('cf_tavily_key') || '';
+    setTavilyKey(savedTavily);
 
     const loadedKeys: { [key: string]: string } = {};
     const loadedModels: { [key: string]: string } = {};
@@ -88,6 +92,7 @@ export default function SettingsPage() {
   const handleSave = () => {
     localStorage.setItem('cf_provider', activeProvider);
     localStorage.setItem('cf_ai_realism', realism);
+    localStorage.setItem('cf_tavily_key', tavilyKey);
     Object.entries(keys).forEach(([provider, key]) => {
       localStorage.setItem(`cf_key_${provider}`, key);
     });
@@ -212,6 +217,32 @@ export default function SettingsPage() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+
+        <div className="glass-card p-8 animate-fade-in">
+          <h2 className="text-xl font-heading font-bold text-white mb-2">Deep Search Integrations</h2>
+          <p className="text-sm text-[var(--color-text-disabled)] mb-6">
+            Input search API keys to crawl Freelancer platforms (Upwork, Fiverr, Freelancer), LinkedIn, and official company job pages.
+          </p>
+
+          <div className="flex flex-col sm:flex-row sm:items-start gap-4 p-4 rounded-xl border border-[var(--color-border-light)] bg-[rgba(255,255,255,0.02)]">
+            <div className="sm:w-1/4 pt-2">
+              <label className="font-medium text-[var(--color-text-secondary)]">Tavily API Key</label>
+              <span className="block text-[10px] text-[var(--color-text-disabled)] mt-1">Get free key at <a href="https://tavily.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-white">tavily.com</a></span>
+            </div>
+            <div className="sm:w-3/4">
+              <input
+                type="password"
+                placeholder="Tavily API Key (tvly-...)"
+                className="input-field w-full"
+                value={tavilyKey}
+                onChange={(e) => setTavilyKey(e.target.value)}
+              />
+              <span className="block text-[11px] text-[var(--color-accent-orange)] mt-2">
+                💡 <strong>Note:</strong> If no Tavily key is configured, search agents will automatically fall back to the built-in free DuckDuckGo scraper.
+              </span>
+            </div>
           </div>
         </div>
 
