@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { getProvider } from '@/lib/llm-providers';
+import { getProvider, resolveActiveLLM } from '@/lib/llm-providers';
 
 interface JobSourceItem {
   title: string;
@@ -175,15 +175,15 @@ export async function POST(req: NextRequest) {
       try { dbModels = JSON.parse(user.selectedModels); } catch (e) {}
     }
 
-    if (!providerName) {
-      providerName = user.activeProvider || 'anthropic';
-    }
-    if (!model) {
-      model = dbModels[providerName] || '';
-    }
-    if (!userApiKey) {
-      userApiKey = dbKeys[providerName] || '';
-    }
+    const resolvedLLM = resolveActiveLLM(
+      dbKeys,
+      dbModels,
+      providerName || user.activeProvider || 'anthropic',
+      model || ''
+    );
+    providerName = resolvedLLM.provider;
+    model = resolvedLLM.model;
+    userApiKey = resolvedLLM.apiKey;
     if (!tavilyApiKey) {
       tavilyApiKey = user.tavilyKey || '';
     }

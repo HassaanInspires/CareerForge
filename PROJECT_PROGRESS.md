@@ -125,6 +125,13 @@ Started with:
 *   **Implementation**:
     *   **Worker Decoupling**: Removed the absolute `path.join(process.cwd(), 'node_modules', ...)` configuration in `lib/documentParser.ts`. Allowing Node.js to use the default built-in fake worker execution thread prevents dynamic file-tracing crashes in serverless runtimes.
 
+### Phase 15: Multi-Provider Fallback & API Key Synchronization (V15.0)
+*   **Objective**: Automatically fall back to whichever LLM provider has an API key configured (e.g. Groq or Mistral) if the requested provider's key is missing, ensuring a seamless user experience across pages.
+*   **Implementation**:
+    *   **Fallback Resolver**: Coded a centralized `resolveActiveLLM` helper in `lib/llm-providers.ts` that checks active provider key state and scans all remaining provider keys for fallback availability.
+    *   **Frontend Synchronization**: Configured `initProfile` to automatically swap provider, model, and keys to the fallback provider if the default active provider has no API key.
+    *   **API-Wide Fallback**: Integrated the resolver across all backend API endpoints (`/api/onboard`, `/api/chat`, `/api/optimize`, `/api/refine`, `/api/challenge/generate`, `/api/challenge/evaluate`, and `/api/jobs/apply`).
+
 ---
 
 ## 3. Code Modifications & Repository Health
@@ -205,3 +212,6 @@ Started with:
 ✅ Green light extraction success banner
 ✅ Interactive Post-Extraction Clarification Modal
 ✅ Bypassed Vercel Serverless Function filesystem worker path dependency to resolve runtime HTML error crashes
+✅ Centralized multi-provider LLM fallback resolver (`resolveActiveLLM`)
+✅ Automatic frontend initialization synchronization for configured API keys
+✅ API-Wide auto-fallback synchronization across all AI endpoints (Onboard, Chat, TargetMatch, PoW, Cover Letter)

@@ -10,6 +10,7 @@ import {
   RESUME_STORAGE_KEY 
 } from '@/lib/memory';
 import { Provider } from '@/lib/types';
+import { resolveActiveLLM } from '@/lib/llm-providers';
 import { 
   loadUserMemory, 
   saveUserMemory, 
@@ -82,14 +83,16 @@ export default function ProfileHub() {
       // Load keys state from DB settings
       const settings = await loadUserSettings();
       if (settings) {
-        const provider = settings.activeProvider as Provider;
-        const key = settings.apiKeys[provider] || '';
-        const modelList = settings.selectedModels || {};
-        const model = modelList[provider] || '';
-        setHasKeys(!!key);
-        setActiveProvider(provider);
-        setActiveModel(model);
-        setApiKey(key);
+        const resolved = resolveActiveLLM(
+          settings.apiKeys || {},
+          settings.selectedModels || {},
+          settings.activeProvider || 'anthropic',
+          (settings.selectedModels || {})[settings.activeProvider || 'anthropic'] || ''
+        );
+        setHasKeys(!!resolved.apiKey);
+        setActiveProvider(resolved.provider);
+        setActiveModel(resolved.model);
+        setApiKey(resolved.apiKey);
         setRealism((settings.aiRealism as 'supportive' | 'brutal') || 'brutal');
       } else {
         const provider = (localStorage.getItem('cf_provider') as Provider) || 'anthropic';

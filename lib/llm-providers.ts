@@ -328,3 +328,65 @@ export function getProvider(provider: Provider): LLMProvider {
       throw new Error(`Unsupported provider: ${provider}`);
   }
 }
+
+export function resolveActiveLLM(
+  dbKeys: Record<string, string>,
+  dbModels: Record<string, string>,
+  activeProvider: string,
+  activeModel: string
+): { provider: Provider; model: string; apiKey: string } {
+  const requestedProvider = activeProvider as Provider;
+  const requestedKey = dbKeys[requestedProvider] || '';
+  
+  if (requestedKey) {
+    return {
+      provider: requestedProvider,
+      model: activeModel || getDefaultModelForProvider(requestedProvider),
+      apiKey: requestedKey
+    };
+  }
+
+  // 1. Check database API keys for fallback
+  const providersPriority: Provider[] = ['groq', 'mistral', 'openai', 'gemini', 'anthropic'];
+  for (const provider of providersPriority) {
+    const key = dbKeys[provider] || '';
+    if (key) {
+      const model = dbModels[provider] || getDefaultModelForProvider(provider);
+      return {
+        provider,
+        model,
+        apiKey: key
+      };
+    }
+  }
+
+  // 2. Check system environment variables for fallback
+  for (const provider of providersPriority) {
+    const envKey = process.env[`${provider.toUpperCase()}_API_KEY`] || '';
+    if (envKey) {
+      return {
+        provider,
+        model: dbModels[provider] || getDefaultModelForProvider(provider),
+        apiKey: envKey
+      };
+    }
+  }
+
+  // 3. Absolute fallback to requested provider if absolutely no keys exist (throws error at caller level)
+  return {
+    provider: requestedProvider,
+    model: activeModel || getDefaultModelForProvider(requestedProvider),
+    apiKey: ''
+  };
+}
+
+export function getDefaultModelForProvider(provider: Provider): string {
+  switch (provider) {
+    case 'anthropic': return 'claude-3-5-sonnet-20240620';
+    case 'openai': return 'gpt-4o';
+    case 'gemini': return 'gemini-1.5-flash';
+    case 'groq': return 'llama3-70b-8192';
+    case 'mistral': return 'mistral-large-latest';
+    default: return '';
+  }
+}
