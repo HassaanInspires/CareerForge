@@ -33,6 +33,9 @@ export default async function Home() {
               <Link href="/profile" className="text-sm font-medium text-[var(--color-text-secondary)] hover:text-white transition-colors">
                 Profile Hub
               </Link>
+              <Link href="/jobs" className="text-sm font-medium text-[var(--color-text-secondary)] hover:text-white transition-colors">
+                Job Hunt Agent
+              </Link>
               <Link href="/simulator" className="text-sm font-medium text-[var(--color-text-secondary)] hover:text-white transition-colors">
                 PoW Simulator
               </Link>

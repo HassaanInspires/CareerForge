@@ -38,6 +38,7 @@ export default function ProfileHub() {
   const [githubUser, setGithubUser] = useState('');
   const [isFetchingGithub, setIsFetchingGithub] = useState(false);
   const [githubError, setGithubError] = useState('');
+  const [hasKeys, setHasKeys] = useState(true);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -69,6 +70,10 @@ export default function ProfileHub() {
       }
     };
     initProfile();
+
+    const provider = localStorage.getItem('cf_provider') || 'anthropic';
+    const apiKey = localStorage.getItem(`cf_key_${provider}`) || '';
+    setHasKeys(!!apiKey);
 
     const savedRealism = localStorage.getItem('cf_ai_realism') as 'supportive' | 'brutal';
     if (savedRealism) setRealism(savedRealism);
@@ -244,6 +249,11 @@ export default function ProfileHub() {
             <p className="text-[var(--color-text-secondary)] mb-8 max-w-md mx-auto">
               Upload your resume once. Our AI will analyze it to build your permanent Candidate Memory Graph. You'll never need to upload it again.
             </p>
+            {!hasKeys && (
+              <div className="mb-6 p-4 rounded bg-[rgba(239,68,68,0.1)] border border-[var(--color-error)] text-[var(--color-error)] text-sm max-w-md mx-auto">
+                ⚠️ <strong>API Key Required:</strong> Please configure your AI Provider and API key in the <a href="/settings" className="underline font-bold hover:text-white">Settings</a> page first. The AI cannot extract memory details from your CV without an active key.
+              </div>
+            )}
             <div>
               <input 
                 type="file" 
