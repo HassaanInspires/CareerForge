@@ -138,6 +138,43 @@ export async function saveUserMemory(memory: CandidateMemory) {
   return { success: true };
 }
 
+export async function saveUserResumeFile(fileName: string, base64Data: string) {
+  const session = await getServerSession(authOptions);
+  
+  if (!session?.user?.email) {
+    throw new Error('Not authenticated');
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { email: session.user.email }
+  });
+
+  if (!user) throw new Error('User not found');
+
+  await prisma.candidateMemory.upsert({
+    where: { userId: user.id },
+    create: {
+      userId: user.id,
+      resumeFileName: fileName,
+      resumeBase64: base64Data,
+      resumeUploadedAt: new Date(),
+      careerLevel: 'Entry Level',
+      careerGoals: '',
+      coreSkills: '[]',
+      verifiableMetrics: '[]',
+      identifiedGaps: '[]',
+      dataSufficiencyScore: 0
+    },
+    update: {
+      resumeFileName: fileName,
+      resumeBase64: base64Data,
+      resumeUploadedAt: new Date()
+    }
+  });
+
+  return { success: true };
+}
+
 export async function loadUserHistory() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) return [];

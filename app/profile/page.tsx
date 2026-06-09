@@ -17,7 +17,8 @@ import {
   loadUserChatLog, 
   saveUserChatLog,
   loadUserSettings,
-  deleteUserResume
+  deleteUserResume,
+  saveUserResumeFile
 } from '@/app/actions/memory';
 import { useSession } from 'next-auth/react';
 
@@ -120,8 +121,21 @@ export default function ProfileHub() {
     reader.onload = async () => {
       try {
         const base64 = (reader.result as string).split(',')[1];
+        
+        // 1. Immediately guarantee CV is saved to database
+        await saveUserResumeFile(file.name, base64);
+        
+        // 2. Update local state
         localStorage.setItem(RESUME_STORAGE_KEY, base64);
         setHasResume(true);
+        if (memory) {
+          setMemory({
+            ...memory,
+            resumeFileName: file.name,
+            resumeBase64: base64,
+            resumeUploadedAt: new Date().toISOString()
+          });
+        }
 
         const res = await fetch('/api/onboard', {
           method: 'POST',
