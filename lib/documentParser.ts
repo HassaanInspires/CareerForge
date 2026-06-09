@@ -1,6 +1,5 @@
-import * as pdfjs from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { getDocumentProxy, extractText } from 'unpdf';
 import * as mammoth from 'mammoth';
-import path from 'path';
 
 /**
  * Extracts text from a DOCX file
@@ -24,28 +23,11 @@ export async function extractTextFromPDF(file: Buffer | Uint8Array): Promise<str
   }
 
   try {
+    const uint8Array = file instanceof Uint8Array ? file : new Uint8Array(file);
+    const pdf = await getDocumentProxy(uint8Array);
+    const { text } = await extractText(pdf, { mergePages: true });
 
-    const loadingTask = pdfjs.getDocument({
-      data: file,
-      useWorkerFetch: false,
-      useSystemFonts: true,
-      // @ts-ignore
-      isEvalSupported: false,
-    });
-    
-    const pdf = await loadingTask.promise;
-    let fullText = '';
-
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items
-        .map((item: any) => item.str)
-        .join(' ');
-      fullText += pageText + '\n';
-    }
-
-    const cleanedText = fullText.replace(/\s+/g, ' ').trim();
+    const cleanedText = text.replace(/\s+/g, ' ').trim();
 
     if (!cleanedText) {
       throw new Error('PDF appears to be empty or contains no extractable text');
