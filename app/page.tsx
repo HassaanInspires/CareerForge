@@ -21,8 +21,8 @@ export default function Home() {
           <Link href="/profile" className="text-sm font-medium text-[var(--color-text-secondary)] hover:text-white transition-colors">
             Profile Hub
           </Link>
-          <Link href="/builder" className="btn-primary text-sm px-4 py-2">
-            Builder Mode
+          <Link href="/simulator" className="btn-primary text-sm px-4 py-2">
+            PoW Simulator
           </Link>
         </div>
       </nav>
@@ -30,25 +30,25 @@ export default function Home() {
       {/* Hero Section */}
       <section className="relative z-10 flex flex-col items-center justify-center text-center px-4 pt-32 pb-20 max-w-5xl mx-auto animate-slide-up">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-[var(--color-border-medium)] bg-[var(--color-bg-secondary)] mb-8">
-          <span className="w-2 h-2 rounded-full bg-[var(--color-success)]"></span>
-          <span className="text-xs font-medium text-[var(--color-text-secondary)]">Enterprise V3.0 is now live</span>
+          <span className="w-2 h-2 rounded-full bg-[var(--color-accent-purple)]"></span>
+          <span className="text-xs font-medium text-[var(--color-text-secondary)]">V5.0: The Proof-of-Work Pivot</span>
         </div>
         
         <h1 className="text-5xl md:text-7xl font-bold tracking-tighter text-white mb-6 leading-tight">
-          Verifiable impact.<br className="hidden md:block" />
-          <span className="text-[var(--color-text-secondary)]">Not AI buzzwords.</span>
+          Kill the resume.<br className="hidden md:block" />
+          <span className="text-[var(--color-text-secondary)]">Prove your work.</span>
         </h1>
         
         <p className="text-lg md:text-xl text-[var(--color-text-secondary)] mb-10 max-w-2xl mx-auto leading-relaxed">
-          The only AI resume engine that extracts authentic metrics, matches against real market demands, and builds persistent career memory to defeat modern Applicant Tracking Systems.
+          The AI resume is dead. Recruiters want proof, not generated fluff. CareerForge connects your actual commits, runs live micro-assessments, and builds a Verified Capabilities Graph that employers actually trust.
         </p>
 
         <div className="flex flex-col sm:flex-row items-center gap-4">
-          <Link href="/builder" className="btn-primary text-lg px-8 py-4 w-full sm:w-auto">
-            Start Diagnostic Session
+          <Link href="/simulator" className="btn-primary text-lg px-8 py-4 w-full sm:w-auto">
+            Try the PoW Simulator
           </Link>
           <Link href="#features" className="btn-secondary text-lg px-8 py-4 w-full sm:w-auto">
-            View Architecture
+            How Verification Works
           </Link>
         </div>
       </section>

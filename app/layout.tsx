@@ -39,7 +39,7 @@ export default function RootLayout({
       lang="en"
       className={`${spaceMono.variable} ${ibmPlexMono.variable} ${sora.variable} ${inter.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-mesh text-white font-sans relative">
+      <body className="min-h-full flex flex-col text-white font-sans relative">
         <div className="doodles-overlay"></div>
         {children}
       </body>

@@ -21,13 +21,44 @@ export default function ProfileHub() {
   const [chatLog, setChatLog] = useState<{role: 'user'|'ai', content: string}[]>([
     { role: 'ai', content: 'Hello! I am your Memory Manager. Want to add any recent achievements or clarify your career goals?' }
   ]);
+  const [history, setHistory] = useState<any[]>([]);
+  const [selectedHistoryItem, setSelectedHistoryItem] = useState<any | null>(null);
+  const [realism, setRealism] = useState<'supportive' | 'brutal'>('brutal');
+
+  // V5.0 Pivot: PoW States
+  const [githubUser, setGithubUser] = useState('');
+  const [isFetchingGithub, setIsFetchingGithub] = useState(false);
+  const [githubError, setGithubError] = useState('');
 
   useEffect(() => {
     const mem = loadMemoryFromLocal();
     setMemory(mem);
     const res = localStorage.getItem(RESUME_STORAGE_KEY);
     if (res) setHasResume(true);
+
+    const savedChat = localStorage.getItem('cf_profile_chat_log');
+    if (savedChat) {
+      try {
+        setChatLog(JSON.parse(savedChat));
+      } catch (e) {}
+    }
+
+    const savedHistory = localStorage.getItem('cf_session_history');
+    if (savedHistory) {
+      try {
+        setHistory(JSON.parse(savedHistory));
+      } catch (e) {}
+    }
+
+    const savedRealism = localStorage.getItem('cf_ai_realism') as 'supportive' | 'brutal';
+    if (savedRealism) setRealism(savedRealism);
   }, []);
+
+  useEffect(() => {
+    if (chatLog.length > 1 || (chatLog.length === 1 && chatLog[0].content !== 'Hello! I am your Memory Manager. Want to add any recent achievements or clarify your career goals?' && chatLog[0].content !== 'Hello! Please upload a new CV to begin.')) {
+      localStorage.setItem('cf_profile_chat_log', JSON.stringify(chatLog));
+    }
+  }, [chatLog]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -61,7 +92,8 @@ export default function ProfileHub() {
             resumeFileName: file.name,
             provider,
             model,
-            userApiKey: apiKey
+            userApiKey: apiKey,
+            realism // V4.0 Addition
           })
         });
 
@@ -107,7 +139,8 @@ export default function ProfileHub() {
           memory: memory,
           provider,
           model,
-          userApiKey: apiKey
+          userApiKey: apiKey,
+          realism // V4.0 Addition
         })
       });
 
@@ -129,10 +162,36 @@ export default function ProfileHub() {
 
   const resetProfile = () => {
     localStorage.removeItem(RESUME_STORAGE_KEY);
+    localStorage.removeItem('cf_profile_chat_log');
     saveMemoryToLocal(defaultMemory);
     setHasResume(false);
     setMemory(defaultMemory);
     setChatLog([{ role: 'ai', content: 'Hello! Please upload a new CV to begin.' }]);
+  };
+
+  const handleConnectGithub = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!githubUser.trim()) return;
+    setIsFetchingGithub(true);
+    setGithubError('');
+    try {
+      const res = await fetch('/api/github', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: githubUser })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      
+      const newMemory = { ...memory!, proofOfWork: [...(memory?.proofOfWork || []), ...data.proofOfWork] };
+      setMemory(newMemory);
+      saveMemoryToLocal(newMemory);
+      setGithubUser('');
+    } catch (err: any) {
+      setGithubError(err.message);
+    } finally {
+      setIsFetchingGithub(false);
+    }
   };
 
   if (!memory) return null;
@@ -223,6 +282,118 @@ export default function ProfileHub() {
                   <h3 className="text-sm font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider mb-3">Career Goals</h3>
                   <p className="text-sm text-white bg-[var(--color-bg-tertiary)] p-3 rounded">{memory.careerGoals || "Not defined. Tell the Memory Manager your goals!"}</p>
                 </div>
+              </div>
+
+              {/* Verified Proof of Work (V5.0) */}
+              <div className="glass-card p-6 border-t-4 border-t-[var(--color-accent-purple)]">
+                <div className="flex justify-between items-start mb-6">
+                  <div>
+                    <h2 className="text-xl font-bold text-white mb-1">Verified Proof of Work</h2>
+                    <p className="text-sm text-[var(--color-text-secondary)]">Public evidence of your capabilities.</p>
+                  </div>
+                </div>
+
+                {memory.proofOfWork && memory.proofOfWork.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                    {memory.proofOfWork.map((pow) => (
+                      <div key={pow.id} className="p-4 rounded-xl border border-[var(--color-border-light)] bg-[rgba(255,255,255,0.01)] hover:bg-[rgba(255,255,255,0.03)] transition-all">
+                        <div className="flex justify-between items-start mb-2">
+                          <span className="text-xs px-2 py-0.5 rounded font-bold uppercase bg-[rgba(143,0,255,0.1)] text-[var(--color-accent-purple)] border border-[var(--color-accent-purple)]">
+                            {pow.type.replace('_', ' ')}
+                          </span>
+                          {pow.metrics?.language && <span className="text-xs text-[var(--color-text-secondary)] font-mono">{pow.metrics.language}</span>}
+                        </div>
+                        <h4 className="text-sm font-semibold text-white truncate mb-1">
+                          <a href={pow.url} target="_blank" rel="noopener noreferrer" className="hover:underline hover:text-[var(--color-accent-blue)]">{pow.title}</a>
+                        </h4>
+                        <p className="text-xs text-[var(--color-text-secondary)] line-clamp-2 mb-3">{pow.description}</p>
+                        <div className="flex gap-3 text-xs font-mono text-[var(--color-text-disabled)]">
+                          {pow.metrics?.stars !== undefined && <span>⭐ {pow.metrics.stars}</span>}
+                          {pow.metrics?.forks !== undefined && <span>🍴 {pow.metrics.forks}</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-[var(--color-text-disabled)] italic text-center py-6 bg-[rgba(255,255,255,0.01)] rounded-xl border border-dashed border-[var(--color-border-light)] mb-6">
+                    No verified work attached yet. Connect your accounts to build trust.
+                  </p>
+                )}
+
+                <div className="bg-[var(--color-bg-tertiary)] p-4 rounded-xl border border-[var(--color-border-medium)]">
+                  <h4 className="text-sm font-bold text-white mb-2">Connect GitHub</h4>
+                  <form onSubmit={handleConnectGithub} className="flex gap-2">
+                    <input 
+                      type="text" 
+                      value={githubUser}
+                      onChange={(e) => setGithubUser(e.target.value)}
+                      placeholder="Enter GitHub Username" 
+                      className="input-field text-sm"
+                      disabled={isFetchingGithub}
+                    />
+                    <button type="submit" disabled={isFetchingGithub || !githubUser} className="btn-secondary py-1 px-4 whitespace-nowrap">
+                      {isFetchingGithub ? 'Connecting...' : 'Fetch Repos'}
+                    </button>
+                  </form>
+                  {githubError && <p className="text-xs text-[var(--color-error)] mt-2">{githubError}</p>}
+                </div>
+              </div>
+
+              {/* Session History Archive */}
+              <div className="glass-card p-6">
+                <h2 className="text-xl font-bold text-white mb-2">Optimization History Archive</h2>
+                <p className="text-sm text-[var(--color-text-secondary)] mb-4">Historical reports and optimized resume builds generated on this device.</p>
+                {history.length > 0 ? (
+                  <div className="space-y-3">
+                    {history.map((item) => (
+                      <div key={item.id} className="p-4 rounded-xl border border-[var(--color-border-light)] bg-[rgba(255,255,255,0.01)] hover:bg-[rgba(255,255,255,0.02)] transition-all">
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <span className={`text-xs px-2 py-0.5 rounded font-bold uppercase ${item.path === 'A' ? 'bg-[rgba(0,212,255,0.1)] text-[var(--color-accent-blue)] border border-[var(--color-accent-blue)]' : 'bg-[rgba(143,0,255,0.1)] text-[var(--color-accent-purple)] border border-[var(--color-accent-purple)]'}`}>
+                              {item.path === 'A' ? 'Job Target' : 'Assessment'}
+                            </span>
+                            <span className="text-xs text-[var(--color-text-disabled)] ml-3 font-mono">{item.timestamp}</span>
+                          </div>
+                          <span className="text-sm font-bold text-white bg-[var(--color-bg-tertiary)] px-2 py-0.5 rounded border border-[var(--color-border-medium)]">
+                            Score: {item.score}%
+                          </span>
+                        </div>
+                        <h4 className="text-sm font-semibold text-white truncate mb-1">{item.title}</h4>
+                        <p className="text-xs text-[var(--color-text-secondary)] mb-3">{item.summary}</p>
+                        
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => setSelectedHistoryItem(selectedHistoryItem?.id === item.id ? null : item)}
+                            className="text-xs font-semibold text-[var(--color-accent-blue)] hover:underline"
+                          >
+                            {selectedHistoryItem?.id === item.id ? 'Hide Content' : 'View Content'}
+                          </button>
+                          <button 
+                            onClick={() => {
+                              navigator.clipboard.writeText(item.output);
+                              alert("Copied to clipboard!");
+                            }}
+                            className="text-xs font-semibold text-[var(--color-text-disabled)] hover:text-white transition-colors"
+                          >
+                            Copy Output
+                          </button>
+                        </div>
+
+                        {selectedHistoryItem?.id === item.id && (
+                          <div className="mt-4 p-4 bg-black/40 rounded border border-[var(--color-border-medium)] overflow-x-auto max-h-[300px]">
+                            <pre className="text-xs text-[var(--color-text-primary)] whitespace-pre-wrap font-mono leading-relaxed">
+                              {item.output}
+                            </pre>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-[var(--color-text-disabled)] italic text-center py-4 bg-[rgba(255,255,255,0.01)] rounded-xl border border-dashed border-[var(--color-border-light)]">
+                    No history items available yet. Generate an assessment or optimized resume to see it here!
+                  </p>
+                )}
               </div>
 
               <div className="flex justify-end">

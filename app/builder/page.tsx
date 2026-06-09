@@ -27,11 +27,14 @@ export default function Home() {
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<OptimizeResponse | null>(null);
+  const [realism, setRealism] = useState<'supportive' | 'brutal'>('brutal');
 
   React.useEffect(() => {
     import('@/lib/memory').then(({ loadMemoryFromLocal }) => {
       setFormData(prev => ({ ...prev, memory: loadMemoryFromLocal() }));
     });
+    const savedRealism = localStorage.getItem('cf_ai_realism') as 'supportive' | 'brutal';
+    if (savedRealism) setRealism(savedRealism);
   }, []);
 
   const nextStep = () => setStep((s) => s + 1);
@@ -90,7 +93,7 @@ export default function Home() {
           userApiKey: config.apiKey,
           memory: formData.memory,
           preferences: formData.preferences,
-          // outputOptions could be added to payload if backend handles it
+          realism, // V4.0 Addition
         }),
       });
 
@@ -101,6 +104,27 @@ export default function Home() {
       }
 
       setResult(data);
+
+      // Save to local session history
+      try {
+        const historyItem = {
+          id: Math.random().toString(36).substring(2, 9),
+          timestamp: new Date().toLocaleString(),
+          path: formData.path || 'A',
+          score: data.advancedScore?.overall || data.matchScore || 0,
+          title: formData.path === 'A' ? (formData.jobDescription.substring(0, 50) + '...') : 'Career Assessment',
+          summary: formData.path === 'A' 
+            ? `Optimized resume targeting a job description.` 
+            : `Career assessment and market standing report.`,
+          output: data.optimizedResume,
+        };
+        const existingHistory = JSON.parse(localStorage.getItem('cf_session_history') || '[]');
+        existingHistory.unshift(historyItem);
+        localStorage.setItem('cf_session_history', JSON.stringify(existingHistory));
+      } catch (e) {
+        console.error("Failed to save session history:", e);
+      }
+
       setStep(6); // Move to results
     } catch (err: any) {
       setError(err.message);
@@ -173,6 +197,7 @@ export default function Home() {
                 jobDescription={formData.jobDescription}
                 onNext={handleStepThree} 
                 onBack={prevStep} 
+                realism={realism}
               />
             )}
             {step === 4 && (

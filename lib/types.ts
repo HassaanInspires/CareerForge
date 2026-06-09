@@ -52,6 +52,7 @@ export interface OptimizeRequest {
   memory?: CandidateMemory;
   userApiKey?: string;
   additionalContext?: string;
+  realism?: 'supportive' | 'brutal';
 }
 
 /**

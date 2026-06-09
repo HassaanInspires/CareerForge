@@ -1,6 +1,16 @@
 import { getProvider } from './llm-providers';
 import { Provider } from './types';
 
+export interface ProofOfWorkItem {
+  id: string;
+  type: 'github_repo' | 'github_commit' | 'portfolio_link' | 'assessment';
+  title: string;
+  description: string;
+  url: string;
+  verifiedAt: string;
+  metrics?: Record<string, any>;
+}
+
 export interface CandidateMemory {
   coreSkills: string[];
   verifiableMetrics: string[];
@@ -9,6 +19,9 @@ export interface CandidateMemory {
   careerLevel: string; // V4.0 Addition
   // Tracks if the AI has enough information to generate a highly competitive resume
   dataSufficiencyScore: number; 
+  // V5.0 Pivot Additions
+  proofOfWork: ProofOfWorkItem[];
+  verifiedSkills: string[];
 }
 
 export const defaultMemory: CandidateMemory = {
@@ -17,7 +30,9 @@ export const defaultMemory: CandidateMemory = {
   careerGoals: '',
   identifiedGaps: [],
   careerLevel: 'Entry Level',
-  dataSufficiencyScore: 0
+  dataSufficiencyScore: 0,
+  proofOfWork: [],
+  verifiedSkills: []
 };
 
 // V4.0 Local Storage Helpers
@@ -54,14 +69,25 @@ export async function updateMemory(
   jobDescription: string,
   providerName: Provider,
   model: string,
-  apiKey: string
+  apiKey: string,
+  realism: 'supportive' | 'brutal' = 'brutal'
 ): Promise<CandidateMemory> {
   const provider = getProvider(providerName);
+
+  const realismRules = realism === 'brutal'
+    ? `PERSONALITY & REALISM RULE (BRUTAL REALISM):
+Be brutally honest, stark, and completely realistic. 
+Assess their careerLevel strictly based on real credentials, not inflated titles.
+Make sure to populate identifiedGaps with real, critical obstacles. Keep dataSufficiencyScore strict (only raise it above 85 if they provide concrete, verifiable numbers and details).`
+    : `PERSONALITY & REALISM RULE (SUPPORTIVE COACHING):
+Highlight strengths and frame credentials positively. Be encouraging.`;
 
   const prompt = `
 You are the Memory Manager of an Enterprise AI Career System.
 Your job is to extract VERIFIABLE FACTS from the user's latest message and update their permanent memory profile.
 Cross-reference these facts with the provided Job Description to determine if we have enough data (dataSufficiencyScore 0-100) to write a top-tier resume.
+
+${realismRules}
 
 CRITICAL GUARDRAILS:
 1. ONLY extract hard skills, numbers, tools, and direct business impact.
@@ -103,7 +129,9 @@ Return ONLY a valid JSON object matching this exact structure, with the updated 
       careerGoals: newMemory.careerGoals || currentMemory.careerGoals || '',
       identifiedGaps: newMemory.identifiedGaps || currentMemory.identifiedGaps || [],
       careerLevel: newMemory.careerLevel || currentMemory.careerLevel || 'Entry Level',
-      dataSufficiencyScore: newMemory.dataSufficiencyScore || currentMemory.dataSufficiencyScore || 0
+      dataSufficiencyScore: newMemory.dataSufficiencyScore || currentMemory.dataSufficiencyScore || 0,
+      proofOfWork: currentMemory.proofOfWork || [],
+      verifiedSkills: currentMemory.verifiedSkills || []
     };
   } catch (err) {
     console.error("Failed to update memory:", err);

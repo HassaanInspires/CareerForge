@@ -188,15 +188,25 @@ export class OpenAIProvider implements LLMProvider {
       );
       const data = await response.json();
       
-      // Filter for chat-capable models if OpenAI, or return all for Groq/Mistral
-      const models = data.data
-        .map((m: any) => ({ id: m.id, name: m.id }))
-        .filter((m: any) => {
-          if (this.provider === 'openai') {
-            return m.id.includes('gpt');
+      // Filter out duplicate models returned by the API
+      const seenIds = new Set<string>();
+      const uniqueModels: { id: string; name: string }[] = [];
+      
+      if (Array.isArray(data.data)) {
+        data.data.forEach((m: any) => {
+          if (m && m.id && !seenIds.has(m.id)) {
+            seenIds.add(m.id);
+            uniqueModels.push({ id: m.id, name: m.id });
           }
-          return true;
         });
+      }
+      
+      const models = uniqueModels.filter((m: any) => {
+        if (this.provider === 'openai') {
+          return m.id.includes('gpt');
+        }
+        return true;
+      });
 
       return models.length > 0 ? models : this.getDefaultModels();
     } catch (err) {

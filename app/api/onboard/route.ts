@@ -11,7 +11,8 @@ export async function POST(req: NextRequest) {
       resumeFileName, 
       provider: providerName, 
       model, 
-      userApiKey 
+      userApiKey,
+      realism = 'brutal'
     } = body;
 
     if (!resumeBase64 || !providerName || !model) {
@@ -30,9 +31,19 @@ export async function POST(req: NextRequest) {
 
     const provider = getProvider(providerName);
 
+    const realismRules = realism === 'brutal'
+      ? `PERSONALITY & REALISM RULE (BRUTAL REALISM):
+Be brutally honest, uncompromised, and realistic. 
+Assess the candidate's career level strictly based on real credentials, not inflated titles.
+Identify deep deficiencies, lack of quantitative output, and true standing.`
+      : `PERSONALITY & REALISM RULE (SUPPORTIVE COACHING):
+Highlight strengths and frame credentials positively. Be encouraging.`;
+
     const prompt = `
 You are the Memory Manager of an Enterprise AI Career System.
 Your job is to parse a newly uploaded Master CV and initialize the candidate's permanent memory profile.
+
+${realismRules}
 
 CRITICAL GUARDRAILS:
 1. ONLY extract hard skills, numbers, tools, and direct business impact.

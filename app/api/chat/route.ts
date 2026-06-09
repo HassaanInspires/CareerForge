@@ -14,7 +14,8 @@ export async function POST(req: NextRequest) {
       memory, 
       provider: providerName, 
       model, 
-      userApiKey 
+      userApiKey,
+      realism = 'brutal'
     } = body;
 
     if (!resumeBase64 || !jobDescription || !providerName || !model) {
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
     // 2. Update Memory if user just replied
     if (messages.length > 0 && messages[messages.length - 1].role === 'user') {
       const lastUserMsg = messages[messages.length - 1].content;
-      currentMemory = await updateMemory(currentMemory, lastUserMsg, jobDescription, providerName, model, userApiKey);
+      currentMemory = await updateMemory(currentMemory, lastUserMsg, jobDescription, providerName, model, userApiKey, realism);
     }
 
     // 3. Check if we have enough data to skip asking more questions
@@ -54,25 +55,32 @@ export async function POST(req: NextRequest) {
     // Format chat history for prompt
     const chatHistoryStr = messages.map((m: any) => `${m.role.toUpperCase()}: ${m.content}`).join('\n');
 
+    const realismRules = realism === 'brutal'
+      ? `Be brutally honest, uncompromised, and realistic. Call out gaps immediately, point out weaknesses in their answer, and demand metrics. Show them exactly what standing they hold.`
+      : `Be encouraging and supportive. Highlight positive strengths while gently inquiring about quantitative details.`;
+
     const prompt = `
 You are an elite, highly critical Executive Career Coach.
 Your goal is to extract strictly verifiable, quantitative metrics and specific technical skills from the user to map their Resume to the Job Description.
+
+PERSONALITY RULE:
+${realismRules}
 
 --- CURRENT MEMORY PROFILE ---
 Skills: ${currentMemory.coreSkills.join(', ')}
 Metrics: ${currentMemory.verifiableMetrics.join(', ')}
 Gaps Identified: ${currentMemory.identifiedGaps.join(', ')}
 Data Sufficiency Score: ${currentMemory.dataSufficiencyScore}/100
-
+ 
 --- RESUME TEXT ---
 ${resumeText.substring(0, 2000)}...
-
+ 
 --- JOB DESCRIPTION ---
 ${jobDescription.substring(0, 2000)}...
-
+ 
 --- RECENT CHAT HISTORY ---
 ${chatHistoryStr}
-
+ 
 INSTRUCTIONS & STRICT GUARDRAILS:
 1. DO NOT answer general questions (e.g., "What is the capital of France?"). Reply: "I am strictly focused on extracting your career data. Please answer my previous question."
 2. DO NOT ask multiple questions at once. Ask EXACTLY ONE highly specific, targeted question.

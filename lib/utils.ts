@@ -61,26 +61,40 @@ export function generatePrompt(
   resume: string,
   jobDescription: string,
   memory: CandidateMemory,
-  preferences: Preferences
+  preferences: Preferences,
+  realism: 'supportive' | 'brutal' = 'brutal'
 ): string {
   const { tone, length, focus } = preferences;
 
   const isCareerAssessment = jobDescription === '[CAREER_ASSESSMENT_MODE]';
 
+  const realismInstructions = realism === 'brutal'
+    ? `PERSONALITY & REALISM RULE (BRUTAL REALISM):
+You must be BRUTALLY HONEST, stark, and completely realistic. 
+Never compromise or inflate credentials. If they lack experience or skills, state it plainly. 
+Specifically call out exactly what roles they QUALIFY for, and what roles they CANNOT qualify for. 
+For career level assessment, do not make it look generic; give a highly realistic, granular corporate evaluation of their standing (e.g. "L5 Senior SWE - plateaued on system design gaps" or "Junior Web Developer - qualifies only for internship/entry-level support roles").
+Identify deep deficiencies, salary ceilings, and true market standing.`
+    : `PERSONALITY & REALISM RULE (SUPPORTIVE COACHING):
+Be supportive, encouraging, and optimistic. Focus on framing their credentials in the best possible corporate light, highlighting potential and transferrable skills.`;
+
   const systemRole = isCareerAssessment 
-    ? "You are an elite AI Executive Career Coach. Your goal is to evaluate the candidate's career level, market fit, and suggest optimal job roles."
-    : "You are an elite, highly critical AI Career Consultant. Your mission is to generate a highly optimized resume that is 100% authentic, verifiable, and free of generic AI buzzwords.";
+    ? `You are an elite AI Executive Career Coach. Your goal is to evaluate the candidate's career level, market fit, and suggest optimal job roles.
+${realismInstructions}`
+    : `You are an elite, highly critical AI Proof-of-Work Engineer. Your mission is to generate a 'Verified Career Graph' or 'Anti-Resume' that presents the candidate's verified skills, Proof of Work, and true market fit. Do not write a traditional resume. Write a Proof of Work Profile that employers can trust.
+${realismInstructions}`;
 
   const outputFormat = isCareerAssessment
     ? `
 5. Provide an 'advancedScore' object evaluating 'overall' (0-100), 'atsParsability' (0-100), 'impactDensity' (0-100), 'keywordAlignment' (0-100), and an 'explanation'.
-6. In 'optimizedResume', output a comprehensive Markdown report detailing their Career Level, Market Fit, Salary Estimates, and Next Steps.
+6. In 'optimizedResume', output a comprehensive Markdown report detailing their Career Level, Market Fit, Salary Estimates, Gaps, and Next Steps.
 `
     : `
 5. Provide an 'advancedScore' object evaluating 'overall' (0-100), 'atsParsability' (0-100), 'impactDensity' (0-100), 'keywordAlignment' (0-100), and an 'explanation' string explaining the score.
 6. Provide a 'gapAnalysis' array detailing blocking factors.
 7. Provide a 'careerRoadmap' array outlining actionable steps to bridge the gaps.
-8. Use Chain-of-Thought reasoning. First, output a <thought> block evaluating the gaps and deciding how to frame the authentic metrics. Then, output exactly the JSON structure requested.
+8. In 'optimizedResume', output a Markdown-formatted "Verified PoW Profile". This should include a short brutal summary, a list of verified skills, and explanations of their Proof of Work (metrics, projects). DO NOT format it as a standard chronological resume.
+9. Use Chain-of-Thought reasoning. First, output a <thought> block evaluating the gaps and deciding how to frame the authentic metrics. Then, output exactly the JSON structure requested.
 `;
 
   let prompt = `${systemRole}
@@ -89,6 +103,7 @@ export function generatePrompt(
 Career Level: ${memory.careerLevel || 'Unknown'}
 Core Skills: ${memory.coreSkills.join(', ')}
 Verifiable Metrics: ${memory.verifiableMetrics.join(', ')}
+Proof of Work (GitHub/Assessments): ${JSON.stringify(memory.proofOfWork?.map(p => p.title) || [])}
 
 --- ORIGINAL RESUME ---
 ${resume}

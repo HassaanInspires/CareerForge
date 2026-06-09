@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { CandidateMemory, defaultMemory } from '@/lib/memory';
+import { CandidateMemory, defaultMemory, saveMemoryToLocal } from '@/lib/memory';
 
 interface StepThreeProps {
   currentMemory: CandidateMemory;
@@ -9,9 +9,10 @@ interface StepThreeProps {
   jobDescription?: string;
   onNext: (memory: CandidateMemory) => void;
   onBack: () => void;
+  realism?: 'supportive' | 'brutal';
 }
 
-export default function StepThree({ currentMemory, resumeBase64, jobDescription, onNext, onBack }: StepThreeProps) {
+export default function StepThree({ currentMemory, resumeBase64, jobDescription, onNext, onBack, realism = 'brutal' }: StepThreeProps) {
   const [memory, setMemory] = useState<CandidateMemory>(currentMemory || defaultMemory);
   const [messages, setMessages] = useState<{ role: 'ai' | 'user', content: string }[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -44,6 +45,7 @@ export default function StepThree({ currentMemory, resumeBase64, jobDescription,
           provider,
           model,
           userApiKey: apiKey,
+          realism, // V4.0 Addition
         }),
       });
 
@@ -55,6 +57,7 @@ export default function StepThree({ currentMemory, resumeBase64, jobDescription,
       
       if (data.memory) {
         setMemory(data.memory);
+        saveMemoryToLocal(data.memory); // Direct long-term memory syncing
       }
 
       if (data.isFinished || data.response.includes('[READY_TO_OPTIMIZE]')) {

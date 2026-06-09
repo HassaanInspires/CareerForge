@@ -22,6 +22,7 @@ export async function POST(req: NextRequest) {
         length: 'standard',
         focus: 'skills',
       },
+      realism = 'brutal',
     } = body;
 
     // Input Validation
@@ -50,7 +51,7 @@ export async function POST(req: NextRequest) {
     const provider = getProvider(providerName);
     
     // 3. Generate Prompt
-    const prompt = generatePrompt(resumeText, jobDescription, memory || defaultMemory, preferences);
+    const prompt = generatePrompt(resumeText, jobDescription, memory || defaultMemory, preferences, realism);
 
     // 4. Call LLM API
     let rawResponse = '';

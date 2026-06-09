@@ -89,6 +89,17 @@ export default function ResultsPanel({ result: initialResult, onReset }: Results
         ...prev,
         optimizedResume: data.refinedResume
       }));
+
+      // Update the latest history item if it exists
+      try {
+        const existingHistory = JSON.parse(localStorage.getItem('cf_session_history') || '[]');
+        if (existingHistory.length > 0) {
+          existingHistory[0].output = data.refinedResume;
+          localStorage.setItem('cf_session_history', JSON.stringify(existingHistory));
+        }
+      } catch (e) {
+        console.error("Failed to update session history after refinement:", e);
+      }
     } catch (err: any) {
       setRefineError(err.message);
     } finally {
@@ -233,15 +244,15 @@ export default function ResultsPanel({ result: initialResult, onReset }: Results
 
       {/* Optimized Content Sections */}
       <div className="space-y-6">
-        <div className="glass-card p-0">
+        <div className="glass-card p-0 border-t-4 border-t-[var(--color-accent-blue)]">
           <div className="p-4 bg-[rgba(255,255,255,0.02)] border-b border-[var(--color-border-medium)] flex justify-between items-center">
-            <h3 className="font-heading font-bold text-[var(--color-text-primary)]">Final Output</h3>
+            <h3 className="font-heading font-bold text-[var(--color-text-primary)]">Verified Career Graph & PoW Profile</h3>
             <button 
               onClick={() => handleCopy(optimizedResume, 'resume')}
               disabled={!optimizedResume}
               className="text-xs font-medium text-[var(--color-accent-blue)] hover:text-[var(--color-accent-blue-dark)] bg-[rgba(0,212,255,0.1)] px-3 py-1.5 rounded-lg border border-[var(--color-accent-blue)] transition-all disabled:opacity-50"
             >
-              {copiedSection === 'resume' ? 'Copied!' : 'Copy to Clipboard'}
+              {copiedSection === 'resume' ? 'Link Copied!' : 'Copy Shareable Link'}
             </button>
           </div>
           <div className="p-6 overflow-x-auto relative min-h-[200px]">

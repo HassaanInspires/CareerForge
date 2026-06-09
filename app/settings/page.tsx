@@ -10,6 +10,7 @@ export default function SettingsPage() {
   const [availableModels, setAvailableModels] = useState<{ [key: string]: { id: string; name: string }[] }>({});
   const [isFetching, setIsFetching] = useState<{ [key: string]: boolean }>({});
   const [saved, setSaved] = useState(false);
+  const [realism, setRealism] = useState('brutal');
 
   const providers = [
     { id: 'anthropic', name: 'Anthropic' },
@@ -23,6 +24,9 @@ export default function SettingsPage() {
     // Load from local storage
     const savedProvider = localStorage.getItem('cf_provider');
     if (savedProvider) setActiveProvider(savedProvider);
+
+    const savedRealism = localStorage.getItem('cf_ai_realism');
+    if (savedRealism) setRealism(savedRealism);
 
     const loadedKeys: { [key: string]: string } = {};
     const loadedModels: { [key: string]: string } = {};
@@ -83,6 +87,7 @@ export default function SettingsPage() {
 
   const handleSave = () => {
     localStorage.setItem('cf_provider', activeProvider);
+    localStorage.setItem('cf_ai_realism', realism);
     Object.entries(keys).forEach(([provider, key]) => {
       localStorage.setItem(`cf_key_${provider}`, key);
     });
@@ -107,6 +112,41 @@ export default function SettingsPage() {
             Back to Builder
           </Link>
         </header>
+
+        <div className="glass-card p-8">
+          <h2 className="text-xl font-heading font-bold text-white mb-6">AI Coaching Personality</h2>
+          <p className="text-sm text-[var(--color-text-disabled)] mb-6">
+            Configure how direct and critical the AI should be when evaluating your profile and generating assessments.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <button
+              onClick={() => setRealism('brutal')}
+              className={`flex-1 py-4 px-4 rounded-xl border text-left transition-all duration-200 ${
+                realism === 'brutal'
+                  ? 'border-[var(--color-accent-blue)] bg-[rgba(0,212,255,0.05)] text-white shadow-[0_0_15px_rgba(0,212,255,0.05)]'
+                  : 'border-[var(--color-border-medium)] bg-transparent text-[var(--color-text-secondary)] hover:border-[var(--color-accent-blue)]'
+              }`}
+            >
+              <div className="font-bold text-sm mb-1 text-[var(--color-accent-blue)]">⚡ Brutal Realism (Default)</div>
+              <div className="text-xs text-[var(--color-text-secondary)] leading-relaxed">
+                The AI will be brutally honest, calling out gaps directly, exposing deficiencies, and identifying exactly what roles you qualify and do not qualify for.
+              </div>
+            </button>
+            <button
+              onClick={() => setRealism('supportive')}
+              className={`flex-1 py-4 px-4 rounded-xl border text-left transition-all duration-200 ${
+                realism === 'supportive'
+                  ? 'border-[var(--color-accent-purple)] bg-[rgba(143,0,255,0.05)] text-white shadow-[0_0_15px_rgba(143,0,255,0.05)]'
+                  : 'border-[var(--color-border-medium)] bg-transparent text-[var(--color-text-secondary)] hover:border-[var(--color-accent-purple)]'
+              }`}
+            >
+              <div className="font-bold text-sm mb-1 text-[var(--color-accent-purple)]">🌱 Supportive Coaching</div>
+              <div className="text-xs text-[var(--color-text-secondary)] leading-relaxed">
+                The AI will frame credentials positively, focusing on transferrable skills, and offer encouraging feedback.
+              </div>
+            </button>
+          </div>
+        </div>
 
         <div className="glass-card p-8">
           <h2 className="text-xl font-heading font-bold text-white mb-6">Default AI Provider</h2>

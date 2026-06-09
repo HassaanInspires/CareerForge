@@ -98,6 +98,11 @@ Started with:
 ✅ Multi-provider AI support (Anthropic, OpenAI, Gemini, Groq, Mistral)
 ✅ Advanced Semantic Scoring (ATS Parsability, Impact Density, Keyword Match)
 ✅ Interactive Post-Generation AI Refinement Chat
+✅ Persistent Profile Hub Chat History (survives page nav/refresh)
+✅ Instant Long-Term Memory Syncing from Builder/Interview
+✅ Optimization & Assessment Session History Archive
+✅ Adjustable AI Coaching Realism setting (Brutal Realism vs Supportive Coaching)
+✅ Uncompromising, brutally realistic evaluation of candidate standing and role qualifications
 ✅ Copy-to-clipboard
 ✅ Modern Dark Mode Vercel Grid UI
 ✅ Responsive design
