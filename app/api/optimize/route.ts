@@ -5,6 +5,7 @@ import { getProvider } from '@/lib/llm-providers';
 import { generatePrompt } from '@/lib/utils';
 import { OptimizeRequest, OptimizeResponse } from '@/lib/types';
 import { searchCareerChunks } from '@/lib/vector';
+import { defaultMemory } from '@/lib/memory';
 
 export async function POST(req: NextRequest) {
   try {
@@ -21,7 +22,7 @@ export async function POST(req: NextRequest) {
       model,
       userApiKey,
       memory,
-      preferences = { tone: 'brutal', length: 'standard', focus: 'proof' },
+      preferences = { tone: 'technical', length: 'standard', focus: 'skills' },
       realism = 'brutal',
     } = body;
 
@@ -47,7 +48,7 @@ export async function POST(req: NextRequest) {
     const provider = getProvider(providerName);
     
     // 3. Generate Prompt (Pass RAG Context instead of full ResumeText)
-    const prompt = generatePrompt(ragContext, jobDescription, memory, preferences, realism);
+    const prompt = generatePrompt(ragContext, jobDescription, memory || defaultMemory, preferences, realism);
 
     // 4. Call LLM API
     let rawResponse = '';

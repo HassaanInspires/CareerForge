@@ -56,7 +56,7 @@ export default function TargetMatchEngine() {
           model,
           userApiKey: apiKey,
           memory,
-          preferences: { tone: 'brutal', length: 'standard', focus: 'proof' },
+          preferences: { tone: 'technical', length: 'standard', focus: 'skills' },
           realism: 'brutal',
         }),
       });
