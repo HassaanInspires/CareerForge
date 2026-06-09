@@ -1,34 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { extractTextFromFile } from '@/lib/documentParser';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { getProvider } from '@/lib/llm-providers';
 import { generatePrompt } from '@/lib/utils';
 import { OptimizeRequest, OptimizeResponse } from '@/lib/types';
-import { defaultMemory } from '@/lib/memory';
+import { searchCareerChunks } from '@/lib/vector';
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const body = await req.json() as OptimizeRequest;
     
     const {
-      resumeBase64,
-      resumeFileName,
       jobDescription,
       provider: providerName,
       model,
       userApiKey,
       memory,
-      preferences = {
-        tone: 'professional',
-        length: 'standard',
-        focus: 'skills',
-      },
+      preferences = { tone: 'brutal', length: 'standard', focus: 'proof' },
       realism = 'brutal',
     } = body;
 
-    // Input Validation
-    if (!resumeBase64) {
-      return NextResponse.json({ error: 'Resume file is required' }, { status: 400 });
-    }
     if (!jobDescription) {
       return NextResponse.json({ error: 'Job description is required' }, { status: 400 });
     }
@@ -36,22 +32,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'LLM provider and model are required' }, { status: 400 });
     }
 
-    // 1. Decode and Parse Document
-    let resumeText = '';
+    // 1. RAG Vector Search: Get the most relevant career chunks
+    let ragContext = '';
     try {
-      const buffer = Buffer.from(resumeBase64, 'base64');
-      const uint8Array = new Uint8Array(buffer);
-      resumeText = await extractTextFromFile(uint8Array, resumeFileName || 'resume.pdf');
+      const relevantChunks = await searchCareerChunks((session.user as any).id, jobDescription, 5);
+      ragContext = relevantChunks.map(c => `[Context from ${c.metadata || 'Profile'}]:\n${c.content}`).join('\n\n');
     } catch (err: any) {
-      console.error('File Parsing Error:', err);
-      return NextResponse.json({ error: `File Parsing Error: ${err.message}` }, { status: 422 });
+      console.warn("RAG Search skipped or failed:", err.message);
+      // Fallback: If vector search fails, just use the raw memory object
+      ragContext = "No vector memory available. Relying on baseline profile stats.";
     }
 
     // 2. Initialize Provider
     const provider = getProvider(providerName);
     
-    // 3. Generate Prompt
-    const prompt = generatePrompt(resumeText, jobDescription, memory || defaultMemory, preferences, realism);
+    // 3. Generate Prompt (Pass RAG Context instead of full ResumeText)
+    const prompt = generatePrompt(ragContext, jobDescription, memory, preferences, realism);
 
     // 4. Call LLM API
     let rawResponse = '';

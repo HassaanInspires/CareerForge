@@ -1,6 +1,10 @@
 import Link from 'next/link';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 
-export default function Home() {
+export default async function Home() {
+  const session = await getServerSession(authOptions);
+
   return (
     <main className="min-h-screen bg-[var(--color-bg-primary)] text-[var(--color-text-primary)] font-sans relative overflow-hidden">
       {/* Subtle Grid Background */}
@@ -18,12 +22,34 @@ export default function Home() {
           <Link href="/settings" className="text-sm font-medium text-[var(--color-text-secondary)] hover:text-white transition-colors">
             Settings
           </Link>
-          <Link href="/profile" className="text-sm font-medium text-[var(--color-text-secondary)] hover:text-white transition-colors">
-            Profile Hub
-          </Link>
-          <Link href="/simulator" className="btn-primary text-sm px-4 py-2">
-            PoW Simulator
-          </Link>
+          
+          {session ? (
+            <>
+              {(session.user as any)?.role === 'ADMIN' && (
+                <Link href="/admin" className="text-sm font-medium text-[var(--color-accent-orange)] hover:text-white transition-colors">
+                  Admin Panel
+                </Link>
+              )}
+              <Link href="/profile" className="text-sm font-medium text-[var(--color-text-secondary)] hover:text-white transition-colors">
+                Profile Hub
+              </Link>
+              <Link href="/simulator" className="text-sm font-medium text-[var(--color-text-secondary)] hover:text-white transition-colors">
+                PoW Simulator
+              </Link>
+              <Link href="/api/auth/signout" className="btn-secondary text-sm px-4 py-2">
+                Sign Out
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link href="/login" className="text-sm font-medium text-[var(--color-text-secondary)] hover:text-white transition-colors">
+                Sign In
+              </Link>
+              <Link href="/register" className="btn-primary text-sm px-4 py-2">
+                Get Started
+              </Link>
+            </>
+          )}
         </div>
       </nav>
 

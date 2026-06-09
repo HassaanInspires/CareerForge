@@ -2,9 +2,26 @@ import { NextRequest, NextResponse } from 'next/server';
 import { extractTextFromFile } from '@/lib/documentParser';
 import { getProvider } from '@/lib/llm-providers';
 import { CandidateMemory, defaultMemory } from '@/lib/memory';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { chunkText, generateEmbedding } from '@/lib/vector';
+import crypto from 'crypto';
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email }
+    });
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
     const body = await req.json();
     const { 
       resumeBase64, 
@@ -27,6 +44,34 @@ export async function POST(req: NextRequest) {
       resumeText = await extractTextFromFile(uint8Array, resumeFileName || 'resume.pdf');
     } catch (err: any) {
       return NextResponse.json({ error: `File Parsing Error: ${err.message}` }, { status: 422 });
+    }
+
+    // Generate pgvector embeddings for resume chunks
+    try {
+      await prisma.careerChunk.deleteMany({
+        where: { userId: user.id }
+      });
+
+      const chunks = chunkText(resumeText, 250);
+      for (const chunk of chunks) {
+        const embedding = await generateEmbedding(chunk);
+        const vectorStr = `[${embedding.join(',')}]`;
+        const uuid = crypto.randomUUID();
+        
+        await prisma.$executeRaw`
+          INSERT INTO "CareerChunk" ("id", "userId", "content", "metadata", "embedding", "createdAt")
+          VALUES (
+            ${uuid},
+            ${user.id},
+            ${chunk},
+            'CV Profile',
+            ${vectorStr}::vector,
+            NOW()
+          );
+        `;
+      }
+    } catch (vectorErr: any) {
+      console.error("Failed to generate or save vector embeddings:", vectorErr);
     }
 
     const provider = getProvider(providerName);
@@ -76,7 +121,9 @@ Return ONLY a valid JSON object matching this exact structure:
       careerGoals: newMemory.careerGoals || '',
       identifiedGaps: [],
       careerLevel: newMemory.careerLevel || 'Entry Level',
-      dataSufficiencyScore: 50 // Start at 50% for initial upload
+      dataSufficiencyScore: 50, // Start at 50% for initial upload
+      proofOfWork: [],
+      verifiedSkills: []
     };
 
     return NextResponse.json({ memory });

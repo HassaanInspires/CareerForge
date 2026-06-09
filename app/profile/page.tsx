@@ -10,8 +10,17 @@ import {
   RESUME_STORAGE_KEY 
 } from '@/lib/memory';
 import { Provider } from '@/lib/types';
+import { 
+  loadUserMemory, 
+  saveUserMemory, 
+  loadUserHistory, 
+  loadUserChatLog, 
+  saveUserChatLog 
+} from '@/app/actions/memory';
+import { useSession } from 'next-auth/react';
 
 export default function ProfileHub() {
+  const { data: session, status } = useSession();
   const [memory, setMemory] = useState<CandidateMemory | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState('');
@@ -31,34 +40,39 @@ export default function ProfileHub() {
   const [githubError, setGithubError] = useState('');
 
   useEffect(() => {
-    const mem = loadMemoryFromLocal();
-    setMemory(mem);
-    const res = localStorage.getItem(RESUME_STORAGE_KEY);
-    if (res) setHasResume(true);
-
-    const savedChat = localStorage.getItem('cf_profile_chat_log');
-    if (savedChat) {
-      try {
-        setChatLog(JSON.parse(savedChat));
-      } catch (e) {}
+    if (status === 'unauthenticated') {
+      window.location.href = '/login';
     }
+  }, [status]);
 
-    const savedHistory = localStorage.getItem('cf_session_history');
-    if (savedHistory) {
-      try {
-        setHistory(JSON.parse(savedHistory));
-      } catch (e) {}
-    }
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+
+    const initProfile = async () => {
+      const mem = await loadUserMemory();
+      if (mem) {
+        setMemory(mem);
+        setHasResume(mem.coreSkills.length > 0 || mem.proofOfWork.length > 0);
+      } else {
+        setMemory(defaultMemory);
+        setHasResume(false);
+      }
+
+      const dbChat = await loadUserChatLog();
+      if (dbChat && dbChat.length > 0) {
+        setChatLog(dbChat);
+      }
+
+      const dbHistory = await loadUserHistory();
+      if (dbHistory) {
+        setHistory(dbHistory);
+      }
+    };
+    initProfile();
 
     const savedRealism = localStorage.getItem('cf_ai_realism') as 'supportive' | 'brutal';
     if (savedRealism) setRealism(savedRealism);
-  }, []);
-
-  useEffect(() => {
-    if (chatLog.length > 1 || (chatLog.length === 1 && chatLog[0].content !== 'Hello! I am your Memory Manager. Want to add any recent achievements or clarify your career goals?' && chatLog[0].content !== 'Hello! Please upload a new CV to begin.')) {
-      localStorage.setItem('cf_profile_chat_log', JSON.stringify(chatLog));
-    }
-  }, [chatLog]);
+  }, [status]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -100,8 +114,11 @@ export default function ProfileHub() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
 
-        saveMemoryToLocal(data.memory);
+        await saveUserMemory(data.memory);
         setMemory(data.memory);
+        const welcomeLog = [{ role: 'ai' as const, content: 'Hello! I have analyzed your CV and initialized your career memory graph. What would you like to discuss or refine?' }];
+        setChatLog(welcomeLog);
+        await saveUserChatLog(welcomeLog);
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -121,10 +138,14 @@ export default function ProfileHub() {
 
     const userMsg = chatInput;
     setChatInput('');
-    setChatLog(prev => [...prev, { role: 'user', content: userMsg }]);
+    
+    const nextChatLog = [...chatLog, { role: 'user' as const, content: userMsg }];
+    setChatLog(nextChatLog);
     setIsTyping(true);
 
     try {
+      await saveUserChatLog(nextChatLog);
+
       const provider = (localStorage.getItem('cf_provider') as Provider) || 'anthropic';
       const apiKey = localStorage.getItem(`cf_key_${provider}`) || '';
       const model = localStorage.getItem(`cf_model_${provider}`) || '';
@@ -133,8 +154,7 @@ export default function ProfileHub() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: [...chatLog, { role: 'user', content: userMsg }],
-          resumeBase64: localStorage.getItem(RESUME_STORAGE_KEY),
+          messages: nextChatLog,
           jobDescription: 'Updating Candidate Profile without a specific job description yet.',
           memory: memory,
           provider,
@@ -149,24 +169,29 @@ export default function ProfileHub() {
 
       if (data.memory) {
         setMemory(data.memory);
-        saveMemoryToLocal(data.memory);
+        await saveUserMemory(data.memory);
       }
 
-      setChatLog(prev => [...prev, { role: 'ai', content: data.response }]);
+      const finalChatLog = [...nextChatLog, { role: 'ai' as const, content: data.response }];
+      setChatLog(finalChatLog);
+      await saveUserChatLog(finalChatLog);
     } catch (err: any) {
-      setChatLog(prev => [...prev, { role: 'ai', content: 'Error: ' + err.message }]);
+      const errorChatLog = [...nextChatLog, { role: 'ai' as const, content: 'Error: ' + err.message }];
+      setChatLog(errorChatLog);
+      await saveUserChatLog(errorChatLog);
     } finally {
       setIsTyping(false);
     }
   };
 
-  const resetProfile = () => {
+  const resetProfile = async () => {
     localStorage.removeItem(RESUME_STORAGE_KEY);
-    localStorage.removeItem('cf_profile_chat_log');
-    saveMemoryToLocal(defaultMemory);
+    await saveUserMemory(defaultMemory);
+    const welcomeLog = [{ role: 'ai' as const, content: 'Hello! Please upload a new CV to begin.' }];
+    await saveUserChatLog(welcomeLog);
     setHasResume(false);
     setMemory(defaultMemory);
-    setChatLog([{ role: 'ai', content: 'Hello! Please upload a new CV to begin.' }]);
+    setChatLog(welcomeLog);
   };
 
   const handleConnectGithub = async (e: React.FormEvent) => {
@@ -185,7 +210,7 @@ export default function ProfileHub() {
       
       const newMemory = { ...memory!, proofOfWork: [...(memory?.proofOfWork || []), ...data.proofOfWork] };
       setMemory(newMemory);
-      saveMemoryToLocal(newMemory);
+      await saveUserMemory(newMemory);
       setGithubUser('');
     } catch (err: any) {
       setGithubError(err.message);

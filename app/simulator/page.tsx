@@ -2,10 +2,13 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { loadMemoryFromLocal, saveMemoryToLocal, CandidateMemory } from '@/lib/memory';
+import { CandidateMemory } from '@/lib/memory';
+import { loadUserMemory, saveUserMemory, saveUserHistory } from '@/app/actions/memory';
 import { Provider } from '@/lib/types';
+import { useSession } from 'next-auth/react';
 
 export default function SimulatorPage() {
+  const { status } = useSession();
   const [provider, setProvider] = useState<Provider>('anthropic');
   const [model, setModel] = useState('');
   const [apiKey, setApiKey] = useState('');
@@ -27,8 +30,19 @@ export default function SimulatorPage() {
   const [evaluation, setEvaluation] = useState<any | null>(null);
 
   useEffect(() => {
-    setMemory(loadMemoryFromLocal());
-  }, []);
+    if (status === 'unauthenticated') {
+      window.location.href = '/login';
+    }
+  }, [status]);
+
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    const initMemory = async () => {
+      const mem = await loadUserMemory();
+      setMemory(mem);
+    };
+    initMemory();
+  }, [status]);
 
   const handleGenerate = async () => {
     if (!targetSkill.trim() || !apiKey) {
@@ -98,7 +112,20 @@ export default function SimulatorPage() {
         };
         const newMemory = { ...memory, proofOfWork: [...(memory.proofOfWork || []), newPow] };
         setMemory(newMemory);
-        saveMemoryToLocal(newMemory);
+        await saveUserMemory(newMemory);
+      }
+
+      // Save to database Session History
+      try {
+        await saveUserHistory(
+          `PoW Simulation: ${targetSkill}`,
+          evalData.feedback.substring(0, 100) + '...',
+          evalData.score,
+          'B',
+          evalData.feedback
+        );
+      } catch (hErr) {
+        console.error("Failed to write simulation history:", hErr);
       }
 
     } catch (err: any) {

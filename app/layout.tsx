@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Space_Mono, IBM_Plex_Mono, Sora, Inter } from "next/font/google";
 import "./globals.css";
+import Providers from "@/components/Providers";
 
 const spaceMono = Space_Mono({
   weight: ["400", "700"],
@@ -40,8 +41,10 @@ export default function RootLayout({
       className={`${spaceMono.variable} ${ibmPlexMono.variable} ${sora.variable} ${inter.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col text-white font-sans relative">
-        <div className="doodles-overlay"></div>
-        {children}
+        <Providers>
+          <div className="doodles-overlay"></div>
+          {children}
+        </Providers>
       </body>
     </html>
   );

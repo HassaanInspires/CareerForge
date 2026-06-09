@@ -20,11 +20,6 @@ Started with:
 
 ## 2. Solution: Switched to Antigravity and Iterative Development & Upgrades (Phases)
 
-- Generated production-ready code
-- All TypeScript strict mode
-- Proper error handling
-- Clean architecture
-
 ### Phase 1: Settings Hub & Dynamic Configuration (V2.0)
 *   **Objective**: Solve AI model deprecation issues (like Groq's `llama3-70b-8192` shutdown) and allow modular keys.
 *   **Implementation**:
@@ -45,64 +40,73 @@ Started with:
     *   **Persistent Profile Hub (`/profile`)**: Implemented a dashboard where users upload their CV once. It initializes their permanent memory and allows updating it via a direct onboarding chat.
     *   **Divergent Paths**: Split the builder flow into Path A (Specific Job target optimization) and Path B (Career level & market fit assessment).
     *   **Advanced Semantic Scoring**: Overhauled the simple 0-100 metric into multi-dimensional cards evaluating ATS parsability, impact density, and keyword alignment.
-    *   **Post-Generation Refinement Chat (`/api/refine`)**: Added an AI-driven edit loop beneath the final resume draft, letting users rewrite sections dynamically through conversational prompt refinements.
+
+### Phase 4: The Enterprise Database & Sync Pivot (V5.0)
+*   **Objective**: Solve "hallucinated fluff" by enforcing Provable Competence. Shift from an "AI Resume Builder" to a **Proof-of-Work (PoW) Verification Engine**.
+*   **Implementation**:
+    *   **Database Migration**: Removed `localStorage` and implemented **Prisma** with a **SQLite** database. All candidate data (memory, verified skills, PoW artifacts) is now securely stored.
+    *   **Authentication**: Integrated **NextAuth.js** with secure Credentials login.
+    *   **Admin Panel**: Built a protected `/admin` route to manage registered users and view system statistics.
+    *   **TargetMatch Engine**: Rewrote the Builder flow into a job targeting engine. Users paste a job description, and the AI cross-references their verified data to generate an "Employer Brief" and "Brutal Reality Check".
+    *   **Deep Sync**: Re-engineered the application's data flow to synchronize the Proof-of-Work data with the main TargetMatch AI prompts using Next.js Server Actions.
+
+### Phase 5: Cloud Database & pgvector Semantic RAG Search (V6.0)
+*   **Objective**: Lower LLM token consumption, scale context window handling, and replace all remaining client-side local storage hacks.
+*   **Implementation**:
+    *   **Supabase PostgreSQL Migration**: Replaced local SQLite with Supabase PostgreSQL cloud hosting.
+    *   **pgvector & Hugging Face Embeddings**: Integrated Hugging Face Inference (`all-MiniLM-L6-v2`) to chunk and embed CV profiles into 384-dimensional vectors saved directly to Supabase.
+    *   **Semantic RAG Chat & Match**: Connected route handlers to run cosine similarity queries, injecting matching chunks dynamically into the LLM prompt.
+    *   **Full Database Session Sync**: Migrated all chat histories and builder match archives to database-backed persistent tables.
 
 ---
 
 ## 3. Code Modifications & Repository Health
 
-### Added Files
-*   [`lib/memory.ts`](file:///careerforge/lib/memory.ts): Core memory schemas, default states, and the RAG-inspired `updateMemory` LLM loop.
-*   [`app/api/chat/route.ts`](file:///careerforge/app/api/chat/route.ts): Continuous dialogue endpoint that parses resumes, processes user replies, updates memory graphs, and tracks data sufficiency.
-*   [`app/api/onboard/route.ts`](file:///careerforge/app/api/onboard/route.ts): Initial memory-onboarding API endpoint.
-*   [`app/api/refine/route.ts`](file:///careerforge/app/api/refine/route.ts): Chat refinement API for real-time post-generation edits.
-*   [`app/profile/page.tsx`](file:///careerforge/app/profile/page.tsx): Central profile memory visualizer and onboarding controller.
-
-### Modified Files
-*   [`app/globals.css`](file:///careerforge/app/globals.css): Stripped neon glassmorphism and bouncy blobs. Integrated a monochrome zinc/slate aesthetic with clean grid-patterns.
-*   [`app/page.tsx`](file:///careerforge/app/page.tsx): Rewrote the Hero, Feature showcase, and added navigation header links.
-*   [`app/builder/page.tsx`](file:///careerforge/app/builder/page.tsx): Updated state machine to handle path selection and support the new `/api/optimize` payload structures.
-*   [`components/StepOne.tsx`](file:///careerforge/components/StepOne.tsx): Overhauled to support Path A/B selection and check for Master CV presence.
-*   [`components/StepThree.tsx`](file:///careerforge/components/StepThree.tsx): Rewrote the static 3-5 question view into an active chat transcript box complete with a real-time "Data Sufficiency" progress meter.
-*   [`components/ResultsPanel.tsx`](file:///careerforge/components/ResultsPanel.tsx): Rebuilt to show Advanced overall scoring graphs and house the "Refine with AI" chat interface.
-*   [`lib/utils.ts`](file:///careerforge/lib/utils.ts): Updated `generatePrompt` to output `advancedScore` and support Career Assessment instructions.
-*   [`lib/types.ts`](file:///careerforge/lib/types.ts): Modified request schemas (`OptimizeRequest`) to integrate `advancedScore` metrics.
+### Key Enterprise Architectural Shifts
+*   [`prisma/schema.prisma`](file:///careerforge/prisma/schema.prisma): Database definitions for `User`, `CandidateMemory` (with chatLog), `ProofOfWork`, `SessionHistory`, and `CareerChunk`.
+*   [`lib/vector.ts`](file:///careerforge/lib/vector.ts): Hugging Face embedding pipeline and Prisma raw query similarity search engine.
+*   [`app/api/auth/[...nextauth]/route.ts`](file:///careerforge/app/api/auth/[...nextauth]/route.ts): NextAuth.js authentication configuration with credentials and `bcryptjs`.
+*   [`app/actions/memory.ts`](file:///careerforge/actions/memory.ts): Next.js Server Actions connecting the UI components to the Prisma database safely (memory, history, and chat logs).
+*   [`app/admin/page.tsx`](file:///careerforge/app/admin/page.tsx): Secure server-side rendered Admin dashboard to monitor platform usage.
+*   [`app/builder/page.tsx`](file:///careerforge/app/builder/page.tsx): Redesigned into the TargetMatch Engine, saving results straight to Postgres history.
+*   [`app/profile/page.tsx`](file:///careerforge/app/profile/page.tsx): Candidate profile dashboard reading/writing entirely from/to database actions.
+*   [`app/api/chat/route.ts`](file:///careerforge/app/api/chat/route.ts): RAG-capable conversation loop that reads candidate context from pgvector chunks.
 
 ---
 
 ## 4. Challenges & Engineering Decisions
 
 ### 1. Vector Database Costs vs. Accessibility
-*   **Challenge**: The user requested vector databases and permanent memory graphs. Standard vector stores (like Pinecone) require database tokens, network configurations, and API bills.
-*   **Solution**: Engineered an **In-Memory RAG Context Compiler**. The LLM behaves as a database writer by reading chat transcripts and outputting structured JSON memory objects. The client stores this in state, and it's re-injected into the prompt context on each turn. This provides identical vector-memory functionality at $0 hosting cost.
+*   **Solution**: Engineered an **In-Memory RAG Context Compiler**. The LLM behaves as a database writer by reading chat transcripts and outputting structured JSON memory objects.
 
-### 2. TSX Template Literal Syntax Error
-*   **Challenge**: Standard backslash escaping in template literals inside script-generated code blocks caused Next.js compiler crashes (`Expected '</', got 'no substitution template literal'`).
-*   **Solution**: Rewrote the TSX component using pure template literals inside the React style brackets: `style={{ width: `${Math.min(memory.dataSufficiencyScore, 100)}%` }}`.
+### 2. Transition from Local Storage to Server DB
+*   **Challenge**: The application heavily relied on synchronous `localStorage` hooks. Converting this to an asynchronous database model without breaking React state flow was tricky.
+*   **Solution**: Introduced Next.js Server Actions and `useSession` hooks. The `useEffect` blocks were refactored to securely fetch profile data only when the user is `authenticated`.
 
-### 3. Vague Resume Metrics
-*   **Challenge**: Users often write vague inputs ("I worked in marketing"), which leads to subpar output.
-*   **Solution**: Programmed strict LLM system prompts that reject generic responses and push back with professional skepticism (e.g. asking "What percentage did click-through rates improve?").
+### 3. Vague Resume Metrics & ATS Limitations
+*   **Challenge**: Users write vague inputs, leading to generic outputs.
+*   **Solution**: Programmed strict LLM system prompts that reject generic responses and introduced the "Brutal Reality Check" which evaluates claims directly against Proof of Work.
 
-### 4. Browser File Overlaps
-*   **Challenge**: Standard CSS absolute overlapping on file input components can intercept browser focus differently, blocking file upload actions.
-*   **Solution**: Hidden file inputs linked to high-trust `<button>` triggers programmatically: `onClick={() => document.getElementById('profile-cv-upload')?.click()}`.
+### 4. Prisma V5 Compatibility
+*   **Challenge**: Encountered schema validation errors due to differences between Prisma versions and Next.js Turbopack compiler.
+*   **Solution**: Standardized on Prisma v5 with proper database URL injection and ran targeted schema generation during build time.
 
 ---
 
-## 5. Current State (V4.0 Complete)
-✅ PDF resume upload & text extraction
-✅ Master CV Persistent Hub & Local memory graph visualizer
+## 5. Current State (Enterprise Verification Engine Complete)
+✅ Full Cloud Database Integration (Prisma / Supabase PostgreSQL)
+✅ pgvector Semantic RAG Search (Hugging Face `all-MiniLM-L6-v2`)
+✅ Decoupled all Local Storage dependencies (Chat logs and match history stored in cloud Postgres)
+✅ User Authentication & Secure Routing (NextAuth)
+✅ Admin Dashboard for Platform Metrics
+✅ Master CV Persistent Hub connected to DB
+✅ GitHub & Simulator Proof-of-Work Data Syncing
+✅ TargetMatch Engine for Brutal Reality Checks
 ✅ Continuous dynamic career onboarding interview
-✅ Split Path Assessment (Job Targeting vs. Career Level assessment)
 ✅ Multi-provider AI support (Anthropic, OpenAI, Gemini, Groq, Mistral)
 ✅ Advanced Semantic Scoring (ATS Parsability, Impact Density, Keyword Match)
 ✅ Interactive Post-Generation AI Refinement Chat
-✅ Persistent Profile Hub Chat History (survives page nav/refresh)
-✅ Instant Long-Term Memory Syncing from Builder/Interview
-✅ Optimization & Assessment Session History Archive
 ✅ Adjustable AI Coaching Realism setting (Brutal Realism vs Supportive Coaching)
-✅ Uncompromising, brutally realistic evaluation of candidate standing and role qualifications
 ✅ Copy-to-clipboard
 ✅ Modern Dark Mode Vercel Grid UI
 ✅ Responsive design

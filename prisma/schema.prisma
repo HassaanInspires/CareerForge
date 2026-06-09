@@ -1,0 +1,86 @@
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_URL")
+  extensions = [vector]
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  role      String   @default("USER") // "USER" | "ADMIN"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memory    CandidateMemory?
+  proofOfWork ProofOfWork[]
+  sessions  SessionHistory[]
+  chunks    CareerChunk[]
+}
+
+model CandidateMemory {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  careerLevel       String?
+  careerGoals       String?
+  
+  coreSkills        String   @default("[]") 
+  verifiableMetrics String   @default("[]")
+  chatLog           String   @default("[]")
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model ProofOfWork {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type        String   // "github_repo" | "assessment"
+  title       String
+  description String?
+  url         String?
+  
+  metrics     String?  @default("{}")
+  
+  verifiedAt  DateTime @default(now())
+}
+
+model SessionHistory {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  title       String
+  summary     String?
+  score       Int
+  path        String   // "A" (Job Target) | "B" (Assessment)
+  
+  output      String
+  
+  createdAt   DateTime @default(now())
+}
+
+model CareerChunk {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  content     String   // The text chunk
+  metadata    String?  // JSON metadata (source: CV, Github, etc.)
+  
+  // The actual vector embedding
+  embedding   Unsupported("vector(384)")
+  
+  createdAt   DateTime @default(now())
+}

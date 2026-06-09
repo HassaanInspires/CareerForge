@@ -1,77 +1,38 @@
-# CareerForge V4.0 — The AI Resume Authenticity Engine
+# CareerForge: The Proof-of-Work Engine
 
-CareerForge is an enterprise-grade, privacy-first career diagnostic platform designed to bridge the gap between static human resumes and complex modern Applicant Tracking Systems (ATS). 
+CareerForge is an enterprise-grade AI career platform that flips the traditional resume builder on its head. Instead of generating inflated, generic fluff, CareerForge acts as a **Verification Engine**. It synthesizes a candidate's base CV, live GitHub repository metrics, and AI micro-assessment scores to create an unforgeable, data-backed **Verified Career Graph**.
 
-Instead of generating generic, buzzword-heavy AI text that hiring managers easily flag, CareerForge uses a **local RAG-inspired Memory Loop** to extract quantitative metrics, skills, and business outcomes from candidates via a dynamic conversational interview.
+## The Problem
+Recruiters don't trust resumes anymore because Generative AI has made it effortless to hallucinate competence. Competitor AI builders exacerbate the problem by generating buzzwords without verifying skills.
 
----
+## The CareerForge Solution
+We build an "Employer Brief" that proves what a candidate can do through data, not adjectives.
+1. **The Profile Hub:** Connect GitHub and run automated 10-minute AI technical challenges. Your verified skills and artifacts are securely logged to the database.
+2. **The TargetMatch Engine:** Paste a target Job Description. Our AI fetches your Verified Graph and outputs a Brutal Reality Check. It highlights exactly where your *provable* skills match the job, and where you fall short.
 
-## ✨ Features (V4.0 - Working Now)
+## Tech Stack
+- **Framework:** Next.js 16 (App Router)
+- **Database:** Supabase PostgreSQL with `pgvector` extension via Prisma ORM
+- **Authentication:** NextAuth.js with bcryptjs
+- **Styling:** Vanilla CSS (`index.css`) & CSS Modules
+- **AI & Embedding Integration:** Hugging Face Inference (`all-MiniLM-L6-v2`) for vector embeddings, alongside support for Anthropic, OpenAI, Mistral, xAI.
 
-### 1. Master CV Persistent Hub (`/profile`)
-Upload your resume once. The system extracts your baseline history, saves it in local browser storage, and uses it for all future applications without forcing you to re-upload.
+## Getting Started
 
-### 2. Candidate Memory Graph Visualizer
-See your inferred Career Level (e.g. Entry, Senior, Executive), Core Skills, and Verifiable Metrics directly on a high-trust, visual memory dashboard. Talk directly to your personal Memory Manager via chat to dynamically edit or update your data.
-
-### 3. Divergent Assessment Paths
-*   **Path A (Job Target Optimization)**: Paste a job description. The AI compares it with your memory graph, asks dynamic follow-up questions to fill in missing details, and outputs an optimized resume.
-*   **Path B (Career Level Assessor)**: The AI assesses your memory graph against current market demands, location, and salary goals to suggest suitable job titles, salary estimates, and flag roles you aren't ready for yet.
-
-### 4. Advanced Multi-Dimensional Scoring
-Provides an explainability layer for your score, breaking evaluations down into:
-*   **ATS Parsability**: Formatting and structure readiness.
-*   **Impact Density**: Quantitative metrics and output indicators.
-*   **Keyword Alignment**: Contextual semantic keyword matches.
-
-### 5. Interactive Post-Generation Refinement Chat
-Allows real-time modification of optimized outputs via a conversation refinement box. Ask the AI to *"Make the summary shorter"* or *"Rewrite the project bullet points to be more technical,"* and it will apply adjustments instantly.
-
----
-
-## 🛠️ Technology Stack
-
-*   **Framework**: Next.js 16 (Turbopack)
-*   **Styling**: TailwindCSS & Vanilla CSS Variables (`app/globals.css`)
-*   **Language**: TypeScript (Strict Mode)
-*   **AI Integration**: Multi-provider LLM interface (Anthropic, OpenAI, Google Gemini, Groq, Mistral)
-*   **Document Processing**: Client-side base64 stream parsing (`pdf.js` & text extractors)
-
----
-
-## ⚙️ Getting Started
-
-### 1. Install Dependencies
+First, install the dependencies:
 ```bash
 npm install
 ```
 
-### 2. Configure Your Keys
-Launch CareerForge and head to `/settings` to configure your LLM providers. Paste your API keys (stored securely in your browser's local storage):
-*   Groq API Key
-*   Anthropic API Key
-*   OpenAI API Key
-*   Gemini API Key
+Set up your database:
+```bash
+npx prisma generate
+npx prisma db push
+```
 
-### 3. Run Dev Server
+Run the development server:
 ```bash
 npm run dev
 ```
-Open [http://localhost:3000](http://localhost:3000) in your browser.
 
----
-
-## 📂 Architecture Overview
-
-```mermaid
-graph TD
-  A[Master CV Uploaded once in Profile Hub] --> B[Baseline Memory Extraction /api/onboard]
-  B --> C[Candidate Memory Dashboard]
-  C -->|Path A: Target Job| D[Job Optimizer: Interview Loop]
-  C -->|Path B: Career Level| E[Career Assessment Report]
-  D --> F[Advanced Scoring Breakdown]
-  F --> G[Interactive Refinement Chat /api/refine]
-  G --> H[Final Optimized Resume Output]
-```
-
-For a detailed chronicle of modifications and design decisions, see [PROJECT_PROGRESS.md](./PROJECT_PROGRESS.md).
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result. You must register an account to access the Profile Hub and Verification tools. Admin users can access `/admin` to view platform analytics.

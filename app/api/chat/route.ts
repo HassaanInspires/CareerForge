@@ -1,15 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { extractTextFromFile } from '@/lib/documentParser';
 import { getProvider } from '@/lib/llm-providers';
 import { updateMemory, CandidateMemory, defaultMemory } from '@/lib/memory';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { searchCareerChunks } from '@/lib/vector';
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    }
+
     const body = await req.json();
     const { 
       messages, 
-      resumeBase64, 
-      resumeFileName, 
       jobDescription, 
       memory, 
       provider: providerName, 
@@ -18,18 +23,21 @@ export async function POST(req: NextRequest) {
       realism = 'brutal'
     } = body;
 
-    if (!resumeBase64 || !jobDescription || !providerName || !model) {
+    if (!jobDescription || !providerName || !model) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // 1. Decode Resume (could cache this, but parsing is usually fast)
+    // 1. Fetch relevant career chunks using RAG semantic search
     let resumeText = '';
     try {
-      const buffer = Buffer.from(resumeBase64, 'base64');
-      const uint8Array = new Uint8Array(buffer);
-      resumeText = await extractTextFromFile(uint8Array, resumeFileName || 'resume.pdf');
-    } catch (err: any) {
-      return NextResponse.json({ error: `File Parsing Error: ${err.message}` }, { status: 422 });
+      const user = session.user as any;
+      const lastUserMsg = messages.length > 0 ? messages[messages.length - 1].content : '';
+      if (user.id && lastUserMsg) {
+        const chunks = await searchCareerChunks(user.id, lastUserMsg, 4);
+        resumeText = chunks.map(c => c.content).join('\n\n');
+      }
+    } catch (ragErr: any) {
+      console.warn("RAG fetch failed inside chat route:", ragErr.message);
     }
 
     const provider = getProvider(providerName);

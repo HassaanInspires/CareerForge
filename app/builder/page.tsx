@@ -1,133 +1,87 @@
 'use client';
 
-import React, { useState } from 'react';
-import StepOne from '@/components/StepOne';
-import StepTwo from '@/components/StepTwo';
-import StepThree from '@/components/StepThree';
-import StepFour from '@/components/StepFour';
-import ResultsPanel from '@/components/ResultsPanel';
-import { Provider, OptimizeResponse } from '@/lib/types';
+import React, { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
+import { loadUserMemory, saveUserHistory } from '@/app/actions/memory';
 import { CandidateMemory, defaultMemory } from '@/lib/memory';
+import { Provider, OptimizeResponse } from '@/lib/types';
+import ResultsPanel from '@/components/ResultsPanel';
+import Link from 'next/link';
 
-export default function Home() {
+export default function TargetMatchEngine() {
+  const { data: session, status } = useSession();
+  const [memory, setMemory] = useState<CandidateMemory | null>(null);
   const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState({
-    resumeBase64: '',
-    resumeFileName: '',
-    jobDescription: '',
-    path: 'A', // V4.0 Addition
-    memory: defaultMemory as CandidateMemory,
-    preferences: {
-      tone: 'professional',
-      length: 'standard',
-      focus: 'skills',
-    } as any, // Will cast properly later
-    outputOptions: [] as string[],
-  });
+  const [jobDescription, setJobDescription] = useState('');
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<OptimizeResponse | null>(null);
-  const [realism, setRealism] = useState<'supportive' | 'brutal'>('brutal');
 
-  React.useEffect(() => {
-    import('@/lib/memory').then(({ loadMemoryFromLocal }) => {
-      setFormData(prev => ({ ...prev, memory: loadMemoryFromLocal() }));
-    });
-    const savedRealism = localStorage.getItem('cf_ai_realism') as 'supportive' | 'brutal';
-    if (savedRealism) setRealism(savedRealism);
-  }, []);
-
-  const nextStep = () => setStep((s) => s + 1);
-  const prevStep = () => setStep((s) => s - 1);
-
-  const handleStepOne = (data: { resumeBase64: string; fileName: string; path: 'A' | 'B' }) => {
-    setFormData((prev) => ({ 
-      ...prev, 
-      resumeBase64: data.resumeBase64, 
-      resumeFileName: data.fileName,
-      path: data.path
-    }));
-    if (data.path === 'A') {
-      nextStep();
-    } else {
-      setFormData((prev) => ({ ...prev, jobDescription: '[CAREER_ASSESSMENT_MODE]' }));
-      setStep(4); // Skip to preferences
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      window.location.href = '/login';
     }
-  };
+  }, [status]);
 
-  const handleStepTwo = (jobDescription: string) => {
-    setFormData((prev) => ({ ...prev, jobDescription }));
-    nextStep();
-  };
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    const initMemory = async () => {
+      const mem = await loadUserMemory();
+      setMemory(mem || defaultMemory);
+    };
+    initMemory();
+  }, [status]);
 
-  const handleStepThree = (memory: CandidateMemory) => {
-    setFormData((prev) => ({ ...prev, memory }));
-    nextStep();
-  };
+  const handleAnalyze = async () => {
+    if (!jobDescription.trim()) {
+      setError("Please paste a target job description.");
+      return;
+    }
 
-  const handleStepFour = async (data: { preferences: any; outputOptions: string[] }) => {
-    setFormData((prev) => ({ ...prev, preferences: data.preferences, outputOptions: data.outputOptions }));
-    nextStep(); // Move to Step 5 (Loading State)
+    setStep(2); // Loading State
+    setIsOptimizing(true);
+    setError(null);
 
     const provider = (localStorage.getItem('cf_provider') as Provider) || 'anthropic';
     const apiKey = localStorage.getItem(`cf_key_${provider}`) || '';
     const model = localStorage.getItem(`cf_model_${provider}`) || '';
-
-    handleGenerate({ provider, model, apiKey });
-  };
-
-  const handleGenerate = async (config: { provider: Provider; model: string; apiKey: string }) => {
-    setIsOptimizing(true);
-    setError(null);
 
     try {
       const response = await fetch('/api/optimize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          resumeBase64: formData.resumeBase64,
-          resumeFileName: formData.resumeFileName,
-          jobDescription: formData.jobDescription,
-          provider: config.provider,
-          model: config.model,
-          userApiKey: config.apiKey,
-          memory: formData.memory,
-          preferences: formData.preferences,
-          realism, // V4.0 Addition
+          jobDescription,
+          provider,
+          model,
+          userApiKey: apiKey,
+          memory,
+          preferences: { tone: 'brutal', length: 'standard', focus: 'proof' },
+          realism: 'brutal',
         }),
       });
 
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to optimize resume');
-      }
+      if (!response.ok) throw new Error(data.error || 'Failed to analyze fit');
 
       setResult(data);
+      setStep(3); // Results State
 
-      // Save to local session history
+      // Save to database Session History
       try {
-        const historyItem = {
-          id: Math.random().toString(36).substring(2, 9),
-          timestamp: new Date().toLocaleString(),
-          path: formData.path || 'A',
-          score: data.advancedScore?.overall || data.matchScore || 0,
-          title: formData.path === 'A' ? (formData.jobDescription.substring(0, 50) + '...') : 'Career Assessment',
-          summary: formData.path === 'A' 
-            ? `Optimized resume targeting a job description.` 
-            : `Career assessment and market standing report.`,
-          output: data.optimizedResume,
-        };
-        const existingHistory = JSON.parse(localStorage.getItem('cf_session_history') || '[]');
-        existingHistory.unshift(historyItem);
-        localStorage.setItem('cf_session_history', JSON.stringify(existingHistory));
-      } catch (e) {
-        console.error("Failed to save session history:", e);
+        await saveUserHistory(
+          `Job Match: ${jobDescription.substring(0, 40)}...`,
+          data.advancedScore?.explanation || 'Brutal Reality Check evaluated.',
+          data.advancedScore?.overall || 0,
+          'A',
+          data.optimizedResume
+        );
+      } catch (hErr) {
+        console.error("Failed to write session history:", hErr);
       }
-
-      setStep(6); // Move to results
     } catch (err: any) {
       setError(err.message);
+      setStep(1); // Go back to input
     } finally {
       setIsOptimizing(false);
     }
@@ -136,109 +90,86 @@ export default function Home() {
   const reset = () => {
     setStep(1);
     setResult(null);
-    setError(null);
-    setFormData({
-      resumeBase64: '',
-      resumeFileName: '',
-      jobDescription: '',
-      memory: defaultMemory as CandidateMemory,
-      preferences: {
-        tone: 'professional',
-        length: 'standard',
-        focus: 'skills',
-      } as any,
-      outputOptions: [],
-    });
+    setJobDescription('');
   };
 
+  if (status === 'loading' || !memory) {
+    return <div className="min-h-screen flex items-center justify-center">Loading Verified Graph...</div>;
+  }
+
   return (
-    <main className="min-h-screen p-4 md:p-8">
+    <main className="min-h-screen p-4 md:p-8 bg-[var(--color-bg-primary)]">
       <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <header className="flex items-center justify-between mb-12 animate-slide-up">
-          <div className="flex items-center gap-2">
+        <header className="flex items-center justify-between mb-12">
+          <Link href="/" className="flex items-center gap-2 hover:opacity-80">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center btn-primary p-0">
               <span className="text-white font-heading font-bold text-xl">C</span>
             </div>
             <h1 className="text-2xl font-heading font-black text-white tracking-tight">
-              Career<span style={{ color: "var(--color-accent-blue)" }}>Forge</span>
+              Target<span style={{ color: "var(--color-accent-orange)" }}>Match</span> Engine
             </h1>
-          </div>
-          {step <= 4 && (
-            <div className="hidden md:flex items-center gap-4">
-              <span className="text-[var(--color-text-secondary)] text-sm font-medium">Step {step} of 4</span>
-              <div className="w-32 h-2 bg-[var(--color-bg-tertiary)] rounded-full overflow-hidden">
-                <div 
-                  className="h-full transition-all duration-500"
-                  style={{ width: `${(step / 4) * 100}%`, backgroundColor: 'var(--color-accent-blue)' }}
-                ></div>
-              </div>
-            </div>
-          )}
+          </Link>
+          <Link href="/profile" className="text-sm text-[var(--color-text-secondary)] hover:text-white">Back to Profile Hub</Link>
         </header>
 
-        {/* Content Area */}
-        <div className="glass-card min-h-[500px] animate-slide-up" style={{ animationDelay: '0.1s' }}>
+        <div className="glass-card min-h-[500px]">
           <div className="p-2 md:p-6">
             {step === 1 && (
-              <StepOne onNext={handleStepOne} onError={setError} />
+              <div className="space-y-8 animate-fade-in">
+                <div>
+                  <h2 className="text-2xl font-bold text-white mb-2">Target a Role</h2>
+                  <p className="text-[var(--color-text-secondary)]">
+                    Paste the job description. The AI will cross-reference it against your Verified Graph (CV + Proof of Work) and generate a Brutal Reality Check and Employer Brief.
+                  </p>
+                </div>
+
+                <div className="bg-[rgba(255,255,255,0.02)] p-4 rounded-xl border border-[var(--color-border-medium)]">
+                  <h3 className="text-sm font-medium text-[var(--color-accent-purple)] mb-2">Your Current Verified Graph Data:</h3>
+                  <p className="text-xs text-[var(--color-text-secondary)] font-mono">
+                    • {memory.coreSkills.length} Verified Skills<br/>
+                    • {memory.proofOfWork?.length || 0} Proof-of-Work Artifacts (GitHub/Assessments)<br/>
+                    • Base CV uploaded: {memory.coreSkills.length > 0 ? "Yes" : "No"}
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-white">Target Job Description</label>
+                  <textarea 
+                    value={jobDescription}
+                    onChange={(e) => setJobDescription(e.target.value)}
+                    placeholder="Paste the target job description here..."
+                    className="input-field w-full h-64 resize-none font-mono text-sm leading-relaxed"
+                  />
+                  {error && <p className="text-[var(--color-error)] text-sm">{error}</p>}
+                </div>
+
+                <button onClick={handleAnalyze} className="btn-primary w-full py-4 text-lg">
+                  Run Brutal Reality Check
+                </button>
+              </div>
             )}
+
             {step === 2 && (
-              <StepTwo 
-                currentData={formData.jobDescription} 
-                onNext={handleStepTwo} 
-                onBack={prevStep} 
-              />
-            )}
-            {step === 3 && (
-              <StepThree 
-                currentMemory={formData.memory} 
-                resumeBase64={formData.resumeBase64}
-                jobDescription={formData.jobDescription}
-                onNext={handleStepThree} 
-                onBack={prevStep} 
-                realism={realism}
-              />
-            )}
-            {step === 4 && (
-              <StepFour 
-                currentPreferences={formData.preferences} 
-                currentOutputOptions={formData.outputOptions}
-                onNext={handleStepFour} 
-                onBack={prevStep} 
-              />
-            )}
-            {step === 5 && !result && (
               <div className="flex flex-col items-center justify-center p-12 text-center animate-fade-in">
                 <div className="relative mb-8">
                   <div className="w-24 h-24 rounded-full border-4 border-[var(--color-bg-tertiary)]"></div>
-                  <div className="absolute top-0 left-0 w-24 h-24 rounded-full border-4 border-t-[var(--color-accent-blue)] border-r-[var(--color-accent-purple)] border-b-transparent border-l-transparent animate-spin"></div>
+                  <div className="absolute top-0 left-0 w-24 h-24 rounded-full border-4 border-t-[var(--color-accent-orange)] border-r-[var(--color-accent-purple)] border-b-transparent border-l-transparent animate-spin"></div>
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-2xl">🤖</span>
+                    <span className="text-2xl">🔥</span>
                   </div>
                 </div>
-                <h3 className="text-xl font-heading font-bold text-white mb-2">Analyzing your profile...</h3>
-                <p className="text-[var(--color-text-secondary)]">Extracting deep AI insights and precision scoring.</p>
-                {error && (
-                  <div className="mt-6 p-4 bg-[rgba(239,68,68,0.1)] border border-[var(--color-error)] rounded-xl animate-pop-in">
-                    <p className="text-[var(--color-error)] text-sm">{error}</p>
-                    <button onClick={() => setStep(4)} className="mt-3 text-[var(--color-accent-blue)] hover:text-white underline text-sm transition-colors">Go back</button>
-                  </div>
-                )}
+                <h3 className="text-xl font-heading font-bold text-white mb-2">Cross-Referencing Proof of Work...</h3>
+                <p className="text-[var(--color-text-secondary)]">Evaluating your claims against actual data.</p>
               </div>
             )}
-            {step === 6 && result && (
+
+            {step === 3 && result && (
               <div className="animate-bounce-in">
                 <ResultsPanel result={result} onReset={reset} />
               </div>
             )}
           </div>
         </div>
-
-        {/* Footer Info */}
-        <footer className="mt-8 text-center text-[var(--color-text-disabled)] text-xs animate-fade-in">
-          <p>© 2026 CareerForge AI. Powered by Anthropic, OpenAI & Google.</p>
-        </footer>
       </div>
     </main>
   );
