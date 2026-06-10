@@ -17,6 +17,7 @@ This document serves as a comprehensive history of the core problems, bugs, side
 | **7. Adzuna Sign-up Friction** | Adzuna API required a long developer registration phase before keys were issued. | High barrier to entry; users couldn't test the agent's job matching capabilities immediately. | Integrated RemoteOK's keyless feed and made Adzuna API optional. | ✅ Fixed |
 | **8. Stale/Out-of-Date Search Postings** | API feeds were merged sequentially without sorting, leaving new keyless postings cut off at the bottom. | Search results showed old/stale jobs rather than the latest postings. | Normalized dates across all engines and sorted all combined jobs chronologically. | ✅ Fixed |
 | **9. Job List Size Cut-Down** | AI Relevance Gatekeeper filtered out non-matching jobs, reducing output below requested 6/12 limits. | Roster page returned very few jobs (e.g. 1 or 2 instead of 6/12). | Implemented an automated fuzzy-matched backfill safety fallback. | ✅ Fixed |
+| **10. Irrelevant Crawl Bloat** | General API feeds (Arbeitnow) imported non-matching jobs, while quoted query formats caused search engines to return empty lists. | Roster was flooded with unrelated local positions (e.g., German-language SEO editors and electro-technical leads). | Switched to unquoted query formats, calculated a match density score, and strictly filtered out 0-match listings. | ✅ Fixed |
 
 ---
 
@@ -85,3 +86,12 @@ This document serves as a comprehensive history of the core problems, bugs, side
 *   **The Root Cause**: The AI Relevance Gatekeeper filtered out non-jobs and spam links, reducing the remaining list size.
 *   **The Fix**:
     *   Implemented a backfill safeguard in `/api/jobs/search/route.ts`. If the AI Relevance Gatekeeper filters reduce the list size below the requested quota (6 or 12), the backend backfills the remaining slots using fuzzy keyword matched jobs from the original crawled pool.
+
+### 10. Irrelevant Crawl Bloat & Quoted Search Fallbacks
+*   **The Symptom**: Search queries returned completely irrelevant local jobs (like Electro-Leittechnik or SEO Editor) even when searching for specific developer roles.
+*   **The Root Cause**: Double quotes forced search engines to lookup the exact long search query. When no exact match was found, search engines defaulted to generic listings. Simultaneously, unfiltered general API feeds (like Arbeitnow) were injected directly without matching the search term.
+*   **The Fix**:
+    *   Replaced double quotes with unquoted keyword lists to give search engines flexible search capabilities.
+    *   Implemented a local `calculateRelevanceScore` keyword density scorer.
+    *   Strictly discarded any job listing with a relevance score of 0 (no matching keywords).
+    *   Sorted listings primarily by match relevance score (descending) and secondarily by date freshness (newest first).

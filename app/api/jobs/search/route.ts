@@ -14,6 +14,7 @@ interface JobSourceItem {
   isRemote: boolean;
   source: 'tavily' | 'duckduckgo' | 'adzuna' | 'themuse' | 'remoteok';
   postedTimestamp: number;
+  relevanceScore: number;
 }
 
 // Centralized Date/Timestamp Normalizer Helper
@@ -30,6 +31,40 @@ function parseDateToTimestamp(dateVal: any): number {
     }
   } catch (e) {}
   return 0;
+}
+
+// Local Keyword Relevance Scoring Algorithm
+function calculateRelevanceScore(job: Omit<JobSourceItem, 'relevanceScore'>, query: string): number {
+  const cleanQuery = query.toLowerCase().replace(/["',]/g, ' ').trim();
+  const tokens = cleanQuery.split(/\s+/).filter(w => w.length > 2);
+  if (tokens.length === 0) return 1;
+
+  let score = 0;
+  const title = job.title.toLowerCase();
+  const desc = job.description.toLowerCase();
+
+  // Priority 1: Exact matches of phrase segments split by commas
+  const segments = query.toLowerCase().split(/[,|]/).map(s => s.trim()).filter(s => s.length > 3);
+  for (const segment of segments) {
+    if (title.includes(segment)) {
+      score += 20;
+    }
+    if (desc.includes(segment)) {
+      score += 5;
+    }
+  }
+
+  // Priority 2: Individual token matches
+  for (const token of tokens) {
+    if (title.includes(token)) {
+      score += 5;
+    }
+    if (desc.includes(token)) {
+      score += 1;
+    }
+  }
+
+  return score;
 }
 
 // 1. DuckDuckGo Free Search Scraper (100% Free, No Key Required)
@@ -116,7 +151,8 @@ async function crawlDuckDuckGo(searchQuery: string): Promise<JobSourceItem[]> {
           description: snippetText.substring(0, 1000) || 'Active job opening listed on web directory.',
           isRemote,
           source: 'duckduckgo',
-          postedTimestamp: fallbackTime - (i * 1000) // Stagger slightly
+          postedTimestamp: fallbackTime - (i * 1000),
+          relevanceScore: 0
         });
       }
     }
@@ -176,7 +212,8 @@ async function crawlTavily(searchQuery: string, apiKey: string): Promise<JobSour
         description: r.content || '',
         isRemote,
         source: 'tavily',
-        postedTimestamp: fallbackTime - (idx * 1000)
+        postedTimestamp: fallbackTime - (idx * 1000),
+        relevanceScore: 0
       };
     });
   } catch (error) {
@@ -235,7 +272,8 @@ async function crawlAdzuna(query: string, location: string, appId: string, appKe
         description,
         isRemote,
         source: 'adzuna',
-        postedTimestamp
+        postedTimestamp,
+        relevanceScore: 0
       };
     });
   } catch (error) {
@@ -287,7 +325,8 @@ async function crawlTheMuse(query: string): Promise<JobSourceItem[]> {
           description,
           isRemote,
           source: 'themuse',
-          postedTimestamp
+          postedTimestamp,
+          relevanceScore: 0
         });
       }
     });
@@ -344,7 +383,8 @@ async function crawlRemoteOk(query: string): Promise<JobSourceItem[]> {
         description,
         isRemote: true,
         source: 'remoteok',
-        postedTimestamp
+        postedTimestamp,
+        relevanceScore: 0
       });
     }
 
@@ -429,24 +469,27 @@ export async function POST(req: NextRequest) {
       searchWarning = 'Tavily API key is missing. Automatically falling back to DuckDuckGo Scraper & Public Directories.';
     }
 
+    // Clean search query to exclude commas and forced quotes for flexible matching
+    const cleanQuery = query.replace(/["',]/g, ' ').trim();
+
     // Accumulate parallel search promises
     const promises: Promise<JobSourceItem[]>[] = [];
 
     if (selectedEngine === 'tavily') {
       const searchQueries = [
-        `site:upwork.com/jobs OR site:upwork.com/freelance-jobs "${query}"`,
-        `site:linkedin.com/jobs/view OR site:linkedin.com/jobs "${query}" "${location}"`,
-        `site:greenhouse.io OR site:lever.co OR site:*.jobs "${query}" "${location}"`,
+        `site:upwork.com/jobs OR site:upwork.com/freelance-jobs ${cleanQuery}`,
+        `site:linkedin.com/jobs/view OR site:linkedin.com/jobs ${cleanQuery} ${location}`,
+        `site:greenhouse.io OR site:lever.co OR site:*.jobs ${cleanQuery} ${location}`,
       ];
       searchQueries.forEach(q => promises.push(crawlTavily(q, tavilyApiKey)));
     } else if (selectedEngine === 'duckduckgo') {
-      promises.push(crawlDuckDuckGo(`site:upwork.com/jobs OR site:linkedin.com/jobs "${query}" ${location}`));
-      promises.push(crawlDuckDuckGo(`site:greenhouse.io OR site:lever.co OR site:*.jobs "${query}" ${location}`));
-      promises.push(crawlDuckDuckGo(`"${query}" career page OR hiring OR jobs "${location}"`));
+      promises.push(crawlDuckDuckGo(`site:upwork.com/jobs OR site:linkedin.com/jobs ${cleanQuery} ${location}`));
+      promises.push(crawlDuckDuckGo(`site:greenhouse.io OR site:lever.co OR site:*.jobs ${cleanQuery} ${location}`));
+      promises.push(crawlDuckDuckGo(`${cleanQuery} career page OR hiring OR jobs ${location}`));
     } else {
-      promises.push(crawlTavily(`site:upwork.com/jobs "${query}" ${location}`, tavilyApiKey));
-      promises.push(crawlDuckDuckGo(`site:linkedin.com/jobs "${query}" ${location}`));
-      promises.push(crawlDuckDuckGo(`site:greenhouse.io OR site:lever.co OR site:*.jobs "${query}" ${location}`));
+      promises.push(crawlTavily(`site:upwork.com/jobs ${cleanQuery} ${location}`, tavilyApiKey));
+      promises.push(crawlDuckDuckGo(`site:linkedin.com/jobs ${cleanQuery} ${location}`));
+      promises.push(crawlDuckDuckGo(`site:greenhouse.io OR site:lever.co OR site:*.jobs ${cleanQuery} ${location}`));
     }
 
     // Always fetch The Muse (Public, keyless)
@@ -466,8 +509,10 @@ export async function POST(req: NextRequest) {
     // Fetch public Remotive & Arbeitnow feeds as extra sources in parallel
     const extraPromises: Promise<void>[] = [];
     
+    // Remotive feed search parameter optimized
+    const remotiveSearchTerm = cleanQuery.split(/\s+/)[0] || query;
     extraPromises.push(
-      fetch(`https://remotive.com/api/remote-jobs?search=${encodeURIComponent(query)}&limit=35`)
+      fetch(`https://remotive.com/api/remote-jobs?search=${encodeURIComponent(remotiveSearchTerm)}&limit=35`)
         .then(res => res.ok ? res.json() : null)
         .then(data => {
           if (data && data.jobs && Array.isArray(data.jobs)) {
@@ -482,7 +527,8 @@ export async function POST(req: NextRequest) {
                 description: (j.description || '').replace(/<[^>]*>/g, '').substring(0, 1000),
                 isRemote: true,
                 source: 'duckduckgo',
-                postedTimestamp
+                postedTimestamp,
+                relevanceScore: 0
               });
             });
           }
@@ -505,7 +551,8 @@ export async function POST(req: NextRequest) {
                 description: (j.description || '').replace(/<[^>]*>/g, '').substring(0, 1000),
                 isRemote: !!j.remote,
                 source: 'duckduckgo',
-                postedTimestamp
+                postedTimestamp,
+                relevanceScore: 0
               });
             });
           }
@@ -527,16 +574,35 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ jobs: [], warning: searchWarning });
     }
 
-    // Sort by date/timestamp descending (newest first)
-    dedupedJobs.sort((a, b) => b.postedTimestamp - a.postedTimestamp);
+    // Populate relevance scores and strictly filter out postings with 0 keyword matches
+    const scoredJobs = dedupedJobs.map(job => {
+      const relevanceScore = calculateRelevanceScore(job, query);
+      return { ...job, relevanceScore };
+    });
+
+    // Discard any job with a relevanceScore of 0
+    let relevantJobs = scoredJobs.filter(job => job.relevanceScore > 0);
+
+    if (relevantJobs.length === 0) {
+      // Fallback: If everything got filtered out, keep a basic subset to avoid returning empty list
+      relevantJobs = scoredJobs;
+    }
+
+    // Sort: Primary sorting by relevanceScore descending, secondary by date/timestamp descending
+    relevantJobs.sort((a, b) => {
+      if (b.relevanceScore !== a.relevanceScore) {
+        return b.relevanceScore - a.relevanceScore;
+      }
+      return b.postedTimestamp - a.postedTimestamp;
+    });
 
     const maxItems = depth === 'deep' ? 12 : 6;
 
     // 5. STAGE 1: AI Relevance Gatekeeper pipeline
     const provider = getProvider(providerName);
     
-    // Take a larger slice to evaluate (e.g. 35 candidates) so the Gatekeeper can choose from a wide fresh set
-    const gatekeeperCandidateSubset = dedupedJobs.slice(0, 35);
+    // Take a larger slice of high-relevance jobs to evaluate (e.g. 35 candidates)
+    const gatekeeperCandidateSubset = relevantJobs.slice(0, 35);
 
     const gatekeeperPrompt = `
 You are the CareerForge AI Relevance Gatekeeper.
@@ -574,45 +640,15 @@ Identify which IDs are real, relevant job listings. Select up to 25 of the most 
       console.warn("Gatekeeper relevance check failed. Falling back to fuzzy token matched filtering.", gatekeeperErr);
     }
 
-    // If gatekeeper returned no results or was bypassed, fall back to fuzzy match
+    // If gatekeeper returned no results or was bypassed, fall back to scored subset
     if (pureJobs.length === 0) {
-      const searchTokens = query.toLowerCase().split(/[\s,+-]+/).filter((w: string) => w.length > 2);
-      if (searchTokens.length > 0) {
-        pureJobs = dedupedJobs.filter(j => {
-          return searchTokens.some((token: string) => 
-            j.title.toLowerCase().includes(token) ||
-            j.description.toLowerCase().includes(token) ||
-            j.company.toLowerCase().includes(token)
-          );
-        });
-      } else {
-        pureJobs = dedupedJobs;
-      }
+      pureJobs = relevantJobs;
     }
 
-    // Safeguard backfill: If pureJobs size is less than maxItems, backfill with items from dedupedJobs to fill requested quota
-    if (pureJobs.length < maxItems && dedupedJobs.length > pureJobs.length) {
+    // Safeguard backfill: If pureJobs size is less than maxItems, backfill with high-scoring items from relevantJobs
+    if (pureJobs.length < maxItems && relevantJobs.length > pureJobs.length) {
       const backfilled = [...pureJobs];
-      const searchTokens = query.toLowerCase().split(/[\s,+-]+/).filter((w: string) => w.length > 2);
-      
-      for (const job of dedupedJobs) {
-        if (backfilled.length >= maxItems) break;
-        if (backfilled.some(j => j.url === job.url)) continue;
-
-        // Prioritize fuzzy keyword matched ones
-        const matchesToken = searchTokens.length === 0 || searchTokens.some((token: string) => 
-          job.title.toLowerCase().includes(token) ||
-          job.description.toLowerCase().includes(token) ||
-          job.company.toLowerCase().includes(token)
-        );
-
-        if (matchesToken) {
-          backfilled.push(job);
-        }
-      }
-
-      // If still not enough, grab remaining non-duplicates
-      for (const job of dedupedJobs) {
+      for (const job of relevantJobs) {
         if (backfilled.length >= maxItems) break;
         if (!backfilled.some(j => j.url === job.url)) {
           backfilled.push(job);

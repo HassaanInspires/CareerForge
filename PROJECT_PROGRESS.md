@@ -159,6 +159,13 @@ Started with:
     *   **DuckDuckGo Past-Month Limit**: Appended `&df=m` to DuckDuckGo HTTP POST requests to restrict crawled pages to the past month.
     *   **Safeguard Backfill**: Implemented an automated backfill module that restores the roster size to the user's chosen limit (6 or 12) with high-scoring fuzzy matches if the AI Relevance Gatekeeper filters out too many items.
 
+### Phase 20: Job Search Relevance Scoring & Query Optimization (V16.5)
+*   **Objective**: Solve the problem of irrelevant results returned from search queries, such as generic non-job links and unrelated German job listings.
+*   **Implementation**:
+    *   **Unquoted Query Optimization**: Modified the engine search format to pass unquoted queries containing spaces, enabling search engines to locate flexible and synonym matches without triggering no-result fallbacks.
+    *   **Strict Local Keyword Match Scoring**: Added a relevance density scoring algorithm (`relevanceScore = (titleMatches * 5) + descriptionMatches`) to filter out jobs with a score of 0.
+    *   **Relevance-First Sorting**: Ordered the final combined listings primarily by keyword relevance score (descending) and secondarily by date freshness (newest first).
+
 ---
 
 ## 3. Code Modifications & Repository Health
