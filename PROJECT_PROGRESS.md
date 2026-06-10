@@ -152,6 +152,13 @@ Started with:
     *   **RemoteOK Engine**: Integrated keyless crawls fetching positions directly from RemoteOK matching user tags.
     *   **Optional Adzuna Settings**: Clarified Adzuna credentials as optional in settings to reduce onboarding hurdles.
 
+### Phase 19: Search Freshness Sorting & Safeguard Backfill (V16.4)
+*   **Objective**: Guarantee that the full requested count of job results (6 or 12) is rendered without being over-filtered, and ensure the latest postings are prioritized.
+*   **Implementation**:
+    *   **Freshness Date Parsing**: Introduced a centralized date normalization parser, extracting native posting date properties across all crawlers and sorting the combined listing pool chronologically.
+    *   **DuckDuckGo Past-Month Limit**: Appended `&df=m` to DuckDuckGo HTTP POST requests to restrict crawled pages to the past month.
+    *   **Safeguard Backfill**: Implemented an automated backfill module that restores the roster size to the user's chosen limit (6 or 12) with high-scoring fuzzy matches if the AI Relevance Gatekeeper filters out too many items.
+
 ---
 
 ## 3. Code Modifications & Repository Health

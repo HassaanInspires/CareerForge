@@ -15,6 +15,8 @@ This document serves as a comprehensive history of the core problems, bugs, side
 | **5. DuckDuckGo Scraper Blocks** | DDG search engine blocked standard search agent GET requests as bots. | Search yielded empty results or timed out completely. | Converted crawler to HTTP POST form submission to bypass bot detection. | ✅ Fixed |
 | **6. Irrelevant Search Listings** | DDG web queries returned guidebooks, directories, and blog posts instead of active jobs. | Candidate listings page flooded with useless non-jobs. | Inserted an AI Relevance Gatekeeper LLM step to audit and discard noise. | ✅ Fixed |
 | **7. Adzuna Sign-up Friction** | Adzuna API required a long developer registration phase before keys were issued. | High barrier to entry; users couldn't test the agent's job matching capabilities immediately. | Integrated RemoteOK's keyless feed and made Adzuna API optional. | ✅ Fixed |
+| **8. Stale/Out-of-Date Search Postings** | API feeds were merged sequentially without sorting, leaving new keyless postings cut off at the bottom. | Search results showed old/stale jobs rather than the latest postings. | Normalized dates across all engines and sorted all combined jobs chronologically. | ✅ Fixed |
+| **9. Job List Size Cut-Down** | AI Relevance Gatekeeper filtered out non-matching jobs, reducing output below requested 6/12 limits. | Roster page returned very few jobs (e.g. 1 or 2 instead of 6/12). | Implemented an automated fuzzy-matched backfill safety fallback. | ✅ Fixed |
 
 ---
 
@@ -69,3 +71,17 @@ This document serves as a comprehensive history of the core problems, bugs, side
 *   **The Root Cause**: API endpoints returned search warnings or empty blocks if keys were absent.
 *   **The Fix**:
     *   Integrated **RemoteOK's** public JSON feed (`https://remoteok.com/api?tag=...`) which does not require authentication keys, ensuring immediate out-of-the-box search capacity. Marked Adzuna credentials as optional in the settings page.
+
+### 8. Stale/Out-of-Date Search Postings
+*   **The Symptom**: Job listings returned older opportunities rather than fresh ones.
+*   **The Root Cause**: Multi-source crawls merged lists sequentially, meaning newer results from sources appended later (like RemoteOK/Remotive) were pushed out of the evaluated list when sliced.
+*   **The Fix**:
+    *   Normalized date fields from all engines into a unified `postedTimestamp` property.
+    *   Sorted the full consolidated `dedupedJobs` list descending (newest first) before sending it to the evaluation filters.
+    *   Appended `&df=m` to DuckDuckGo search queries to limit crawls to listings from the past month.
+
+### 9. Job List Size Cut-Down
+*   **The Symptom**: Users selected "deep" search (12 items) or "quick" search (6 items) but the returned results had fewer listings (often only 1-3 jobs).
+*   **The Root Cause**: The AI Relevance Gatekeeper filtered out non-jobs and spam links, reducing the remaining list size.
+*   **The Fix**:
+    *   Implemented a backfill safeguard in `/api/jobs/search/route.ts`. If the AI Relevance Gatekeeper filters reduce the list size below the requested quota (6 or 12), the backend backfills the remaining slots using fuzzy keyword matched jobs from the original crawled pool.

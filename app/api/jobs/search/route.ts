@@ -13,6 +13,23 @@ interface JobSourceItem {
   description: string;
   isRemote: boolean;
   source: 'tavily' | 'duckduckgo' | 'adzuna' | 'themuse' | 'remoteok';
+  postedTimestamp: number;
+}
+
+// Centralized Date/Timestamp Normalizer Helper
+function parseDateToTimestamp(dateVal: any): number {
+  if (!dateVal) return 0;
+  try {
+    const timestamp = Date.parse(String(dateVal));
+    if (!isNaN(timestamp)) {
+      return timestamp;
+    }
+    const num = Number(dateVal);
+    if (!isNaN(num)) {
+      return num < 9999999999 ? num * 1000 : num;
+    }
+  } catch (e) {}
+  return 0;
 }
 
 // 1. DuckDuckGo Free Search Scraper (100% Free, No Key Required)
@@ -25,7 +42,7 @@ async function crawlDuckDuckGo(searchQuery: string): Promise<JobSourceItem[]> {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Content-Type': 'application/x-www-form-urlencoded'
       },
-      body: `q=${encodeURIComponent(searchQuery)}`
+      body: `q=${encodeURIComponent(searchQuery)}&df=m` // Restricted to past month to ensure freshness
     });
 
     if (!res.ok) {
@@ -36,6 +53,9 @@ async function crawlDuckDuckGo(searchQuery: string): Promise<JobSourceItem[]> {
 
     const results: JobSourceItem[] = [];
     const resultBlocks = html.split(/class="[^"]*result[^"]*"/);
+
+    // Default DuckDuckGo postings to 3 days ago for baseline sorting range
+    const fallbackTime = Date.now() - 3 * 24 * 3600 * 1000;
 
     for (let i = 1; i < resultBlocks.length; i++) {
       const block = resultBlocks[i];
@@ -95,7 +115,8 @@ async function crawlDuckDuckGo(searchQuery: string): Promise<JobSourceItem[]> {
           salary: 'Estimated based on spec',
           description: snippetText.substring(0, 1000) || 'Active job opening listed on web directory.',
           isRemote,
-          source: 'duckduckgo'
+          source: 'duckduckgo',
+          postedTimestamp: fallbackTime - (i * 1000) // Stagger slightly
         });
       }
     }
@@ -130,7 +151,9 @@ async function crawlTavily(searchQuery: string, apiKey: string): Promise<JobSour
     const data = await res.json();
     if (!data.results || !Array.isArray(data.results)) return [];
 
-    return data.results.map((r: any) => {
+    const fallbackTime = Date.now() - 2 * 24 * 3600 * 1000;
+
+    return data.results.map((r: any, idx: number) => {
       let company = 'Web Listing';
       const titleText = r.title || 'Job Opening';
       let cleanTitle = titleText;
@@ -152,7 +175,8 @@ async function crawlTavily(searchQuery: string, apiKey: string): Promise<JobSour
         salary: 'Negotiable',
         description: r.content || '',
         isRemote,
-        source: 'tavily'
+        source: 'tavily',
+        postedTimestamp: fallbackTime - (idx * 1000)
       };
     });
   } catch (error) {
@@ -200,6 +224,8 @@ async function crawlAdzuna(query: string, location: string, appId: string, appKe
                        title.toLowerCase().includes('remote') || 
                        description.toLowerCase().includes('remote');
 
+      const postedTimestamp = parseDateToTimestamp(r.created) || (Date.now() - 4 * 24 * 3600 * 1000);
+
       return {
         title,
         company,
@@ -208,7 +234,8 @@ async function crawlAdzuna(query: string, location: string, appId: string, appKe
         salary: r.salary_min ? `$${Math.round(r.salary_min / 1000)}k - $${Math.round(r.salary_max / 1000)}k` : 'Negotiable',
         description,
         isRemote,
-        source: 'adzuna'
+        source: 'adzuna',
+        postedTimestamp
       };
     });
   } catch (error) {
@@ -250,6 +277,7 @@ async function crawlTheMuse(query: string): Promise<JobSourceItem[]> {
       );
 
       if (matchesQuery) {
+        const postedTimestamp = parseDateToTimestamp(r.publication_date) || (Date.now() - 5 * 24 * 3600 * 1000);
         results.push({
           title,
           company,
@@ -258,7 +286,8 @@ async function crawlTheMuse(query: string): Promise<JobSourceItem[]> {
           salary: 'Estimated based on spec',
           description,
           isRemote,
-          source: 'themuse'
+          source: 'themuse',
+          postedTimestamp
         });
       }
     });
@@ -304,6 +333,7 @@ async function crawlRemoteOk(query: string): Promise<JobSourceItem[]> {
       const location = item.location || 'Remote';
       const salary = item.salary ? `${item.salary}` : 'Estimated based on spec';
       const description = (item.description || '').replace(/<[^>]*>/g, '').substring(0, 1000);
+      const postedTimestamp = parseDateToTimestamp(item.date) || (Date.now() - 1 * 24 * 3600 * 1000);
 
       results.push({
         title,
@@ -313,7 +343,8 @@ async function crawlRemoteOk(query: string): Promise<JobSourceItem[]> {
         salary,
         description,
         isRemote: true,
-        source: 'remoteok'
+        source: 'remoteok',
+        postedTimestamp
       });
     }
 
@@ -441,6 +472,7 @@ export async function POST(req: NextRequest) {
         .then(data => {
           if (data && data.jobs && Array.isArray(data.jobs)) {
             data.jobs.forEach((j: any) => {
+              const postedTimestamp = parseDateToTimestamp(j.publication_date) || (Date.now() - 2 * 24 * 3600 * 1000);
               jobsList.push({
                 title: j.title || '',
                 company: j.company_name || 'Remotive Recruiter',
@@ -449,7 +481,8 @@ export async function POST(req: NextRequest) {
                 salary: j.salary || 'Not specified',
                 description: (j.description || '').replace(/<[^>]*>/g, '').substring(0, 1000),
                 isRemote: true,
-                source: 'duckduckgo'
+                source: 'duckduckgo',
+                postedTimestamp
               });
             });
           }
@@ -462,6 +495,7 @@ export async function POST(req: NextRequest) {
         .then(data => {
           if (data && data.data && Array.isArray(data.data)) {
             data.data.forEach((j: any) => {
+              const postedTimestamp = parseDateToTimestamp(j.created_at) || (Date.now() - 1 * 24 * 3600 * 1000);
               jobsList.push({
                 title: j.title || '',
                 company: j.company_name || 'Arbeitnow Hiring',
@@ -470,7 +504,8 @@ export async function POST(req: NextRequest) {
                 salary: 'Negotiable',
                 description: (j.description || '').replace(/<[^>]*>/g, '').substring(0, 1000),
                 isRemote: !!j.remote,
-                source: 'duckduckgo'
+                source: 'duckduckgo',
+                postedTimestamp
               });
             });
           }
@@ -492,9 +527,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ jobs: [], warning: searchWarning });
     }
 
+    // Sort by date/timestamp descending (newest first)
+    dedupedJobs.sort((a, b) => b.postedTimestamp - a.postedTimestamp);
+
+    const maxItems = depth === 'deep' ? 12 : 6;
+
     // 5. STAGE 1: AI Relevance Gatekeeper pipeline
     const provider = getProvider(providerName);
     
+    // Take a larger slice to evaluate (e.g. 35 candidates) so the Gatekeeper can choose from a wide fresh set
+    const gatekeeperCandidateSubset = dedupedJobs.slice(0, 35);
+
     const gatekeeperPrompt = `
 You are the CareerForge AI Relevance Gatekeeper.
 Your job is to analyze the following candidate job listing results and identify which ones are GENUINE, active job postings matching the query "${query}".
@@ -503,7 +546,7 @@ Discard spam links, developer guides, tutorial documentation, old articles, home
 Candidate Core Skills: ${coreSkills.join(', ')}
 
 --- CANDIDATE JOB LISTINGS ---
-${dedupedJobs.map((job, idx) => `
+${gatekeeperCandidateSubset.map((job, idx) => `
 ID: ${idx}
 Title: ${job.title}
 Company: ${job.company}
@@ -511,13 +554,13 @@ Location: ${job.location}
 Snippet: ${job.description.substring(0, 300)}...
 `).join('\n---\n')}
 
-Identify which IDs are real, relevant job listings. Return ONLY a valid JSON object matching this structure:
+Identify which IDs are real, relevant job listings. Select up to 25 of the most relevant, genuine, active job postings matching the query. Return ONLY a valid JSON object matching this structure:
 {
   "relevantIds": [0, 2]
 }
 `;
 
-    let pureJobs = dedupedJobs;
+    let pureJobs: JobSourceItem[] = [];
     try {
       const rawGatekeeperResponse = await provider.callAPI(gatekeeperPrompt, userApiKey || '', model);
       const gatekeeperJsonMatch = rawGatekeeperResponse.match(/\{[\s\S]*\}/);
@@ -525,10 +568,14 @@ Identify which IDs are real, relevant job listings. Return ONLY a valid JSON obj
       const relevantIds = gatekeeperJson.relevantIds || [];
       
       if (Array.isArray(relevantIds) && relevantIds.length > 0) {
-        pureJobs = dedupedJobs.filter((_, idx) => relevantIds.includes(idx));
+        pureJobs = gatekeeperCandidateSubset.filter((_, idx) => relevantIds.includes(idx));
       }
     } catch (gatekeeperErr) {
       console.warn("Gatekeeper relevance check failed. Falling back to fuzzy token matched filtering.", gatekeeperErr);
+    }
+
+    // If gatekeeper returned no results or was bypassed, fall back to fuzzy match
+    if (pureJobs.length === 0) {
       const searchTokens = query.toLowerCase().split(/[\s,+-]+/).filter((w: string) => w.length > 2);
       if (searchTokens.length > 0) {
         pureJobs = dedupedJobs.filter(j => {
@@ -538,14 +585,42 @@ Identify which IDs are real, relevant job listings. Return ONLY a valid JSON obj
             j.company.toLowerCase().includes(token)
           );
         });
+      } else {
+        pureJobs = dedupedJobs;
       }
     }
 
-    if (pureJobs.length === 0) {
-      return NextResponse.json({ jobs: [], warning: searchWarning });
+    // Safeguard backfill: If pureJobs size is less than maxItems, backfill with items from dedupedJobs to fill requested quota
+    if (pureJobs.length < maxItems && dedupedJobs.length > pureJobs.length) {
+      const backfilled = [...pureJobs];
+      const searchTokens = query.toLowerCase().split(/[\s,+-]+/).filter((w: string) => w.length > 2);
+      
+      for (const job of dedupedJobs) {
+        if (backfilled.length >= maxItems) break;
+        if (backfilled.some(j => j.url === job.url)) continue;
+
+        // Prioritize fuzzy keyword matched ones
+        const matchesToken = searchTokens.length === 0 || searchTokens.some((token: string) => 
+          job.title.toLowerCase().includes(token) ||
+          job.description.toLowerCase().includes(token) ||
+          job.company.toLowerCase().includes(token)
+        );
+
+        if (matchesToken) {
+          backfilled.push(job);
+        }
+      }
+
+      // If still not enough, grab remaining non-duplicates
+      for (const job of dedupedJobs) {
+        if (backfilled.length >= maxItems) break;
+        if (!backfilled.some(j => j.url === job.url)) {
+          backfilled.push(job);
+        }
+      }
+      pureJobs = backfilled;
     }
 
-    const maxItems = depth === 'deep' ? 12 : 6;
     const candidateJobs = pureJobs.slice(0, maxItems);
 
     // 6. STAGE 2: AI Fit scoring, Trust Audit & Competency Validation
