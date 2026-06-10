@@ -9,14 +9,14 @@ Recruiters don't trust resumes anymore because Generative AI has made it effortl
 We build an "Employer Brief" that proves what a candidate can do through data, not adjectives.
 1. **The Profile Hub:** Connect GitHub and run automated 10-minute AI technical challenges. Your verified skills and artifacts are securely logged to the database.
 2. **The TargetMatch Engine:** Paste a target Job Description. Our AI fetches your Verified Graph and outputs a Brutal Reality Check. It highlights exactly where your *provable* skills match the job, and where you fall short.
-3. **The Job Hunt Agent:** Search for remote and physical job listings, freelance platforms (Upwork, Fiverr, Freelancer), and LinkedIn in real time. The agent queries open job feeds, evaluates listings for authenticity to weed out fake companies, generates an ATS compatibility score, and builds custom freelance pitches/cover letters detailing salary justifications and prep checklists.
+3. **The Job Hunt Agent:** Search for remote and physical job listings, freelance platforms (Upwork, Fiverr, Freelancer), and LinkedIn in real time. The agent queries keyless engines (RemoteOK, The Muse, Remotive, Arbeitnow) and official company portal endpoints, applies an AI Relevance Gatekeeper filtering loop to discard search spam, audits listing authenticity, maps ATS fit compatibility, and builds custom copyable application pitch proposals.
 
 ## Tech Stack
 - **Framework:** Next.js 16 (App Router)
 - **Database:** Supabase PostgreSQL with `pgvector` extension via Prisma ORM
 - **Authentication:** NextAuth.js with bcryptjs
 - **Styling:** Vanilla CSS (`globals.css`) & CSS Modules. Google Fonts are imported directly in CSS to allow 100% offline development compiling without `next/font/google` connection failures.
-- **AI & Embedding Integration:** Hugging Face Inference (`all-MiniLM-L6-v2`) for vector embeddings, alongside support for Anthropic, OpenAI, Mistral, xAI. Tavily API can be configured in settings to run deep searches on LinkedIn and Freelance boards (with a built-in unauthenticated DuckDuckGo scraper fallback).
+- **AI & Embedding Integration:** Hugging Face Inference (`all-MiniLM-L6-v2`) for vector embeddings, alongside support for Anthropic, OpenAI, Mistral, xAI. Tavily API can be configured in settings to run deep searches on LinkedIn and Freelance boards, with a built-in unauthenticated DuckDuckGo scraper fallback and keyless API integration for RemoteOK and The Muse.
 
 ## Getting Started
 

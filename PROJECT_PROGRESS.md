@@ -132,6 +132,26 @@ Started with:
     *   **Frontend Synchronization**: Configured `initProfile` to automatically swap provider, model, and keys to the fallback provider if the default active provider has no API key.
     *   **API-Wide Fallback**: Integrated the resolver across all backend API endpoints (`/api/onboard`, `/api/chat`, `/api/optimize`, `/api/refine`, `/api/challenge/generate`, `/api/challenge/evaluate`, and `/api/jobs/apply`).
 
+### Phase 16: Dynamic Interview MCQ & Cover Letter Personalization (V16.1)
+*   **Objective**: Solve standard cover letter/proposal alignment, resolve lack of personalization, and increase pre-pitch candidate validation depth.
+*   **Implementation**:
+    *   **5-Question MCQ Questionnaire**: Overhauled the dynamic questions generator to output exactly 5 targeted technology and timezone fit questions comparing user data with job parameters.
+    *   **User Name Binding**: Parsed the DB-backed user name directly to the cover letter generator to completely bypass `[Your Name]` placeholders.
+    *   **Premium Pitch Strategy Modules**: Implemented Hook Banners, Customization Guides, and a vertical follow-up sequencer inside `/jobs`.
+
+### Phase 17: Adzuna, The Muse, and AI Relevance Gatekeeper (V16.2)
+*   **Objective**: Solve crawler reliability errors (bot blocks), increase active job listings volume, and filter out search noise.
+*   **Implementation**:
+    *   **DuckDuckGo POST bypass**: Refactored crawler requests to POST to bypass bot detection.
+    *   **Adzuna & The Muse APIs**: Added corporate public crawls targeting global databases.
+    *   **AI Relevance Gatekeeper**: Deployed a dual-stage pipeline separating genuine job postings from blogs, guides, and tutorial directories via LLM semantic checks.
+
+### Phase 18: Keyless RemoteOK Integration & Settings Simplification (V16.3)
+*   **Objective**: Eliminate developer API key signup friction for users, and establish a high-quality keyless remote job engine.
+*   **Implementation**:
+    *   **RemoteOK Engine**: Integrated keyless crawls fetching positions directly from RemoteOK matching user tags.
+    *   **Optional Adzuna Settings**: Clarified Adzuna credentials as optional in settings to reduce onboarding hurdles.
+
 ---
 
 ## 3. Code Modifications & Repository Health

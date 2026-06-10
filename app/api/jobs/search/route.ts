@@ -12,7 +12,7 @@ interface JobSourceItem {
   salary: string;
   description: string;
   isRemote: boolean;
-  source: 'tavily' | 'duckduckgo' | 'adzuna' | 'themuse';
+  source: 'tavily' | 'duckduckgo' | 'adzuna' | 'themuse' | 'remoteok';
 }
 
 // 1. DuckDuckGo Free Search Scraper (100% Free, No Key Required)
@@ -270,6 +270,60 @@ async function crawlTheMuse(query: string): Promise<JobSourceItem[]> {
   }
 }
 
+// 5. RemoteOK Free JSON API (100% Free, Keyless, Extra Professional)
+async function crawlRemoteOk(query: string): Promise<JobSourceItem[]> {
+  try {
+    const cleanTokens = query.toLowerCase().split(/[\s,+-]+/).filter((w: string) => w.length > 2);
+    const tag = cleanTokens[0] || 'dev';
+    
+    const url = `https://remoteok.com/api?tag=${encodeURIComponent(tag)}`;
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    });
+    
+    if (!res.ok) {
+      console.warn("RemoteOK API returned status:", res.status);
+      return [];
+    }
+    
+    const data = await res.json();
+    if (!Array.isArray(data)) return [];
+
+    const results: JobSourceItem[] = [];
+    
+    // Skip index 0 (metadata/legal notice block)
+    for (let i = 1; i < data.length; i++) {
+      const item = data[i];
+      if (!item || !item.url) continue;
+
+      const title = item.position || item.title || 'Remote Developer';
+      const company = item.company || 'Remote Employer';
+      const url = item.url;
+      const location = item.location || 'Remote';
+      const salary = item.salary ? `${item.salary}` : 'Estimated based on spec';
+      const description = (item.description || '').replace(/<[^>]*>/g, '').substring(0, 1000);
+
+      results.push({
+        title,
+        company,
+        url,
+        location,
+        salary,
+        description,
+        isRemote: true,
+        source: 'remoteok'
+      });
+    }
+
+    return results;
+  } catch (error) {
+    console.error("RemoteOK API crawl failed:", error);
+    return [];
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -364,8 +418,11 @@ export async function POST(req: NextRequest) {
       promises.push(crawlDuckDuckGo(`site:greenhouse.io OR site:lever.co OR site:*.jobs "${query}" ${location}`));
     }
 
-    // Always fetch The Muse (Public)
+    // Always fetch The Muse (Public, keyless)
     promises.push(crawlTheMuse(query));
+
+    // Always fetch RemoteOK (Public, keyless)
+    promises.push(crawlRemoteOk(query));
 
     // Fetch Adzuna if credentials exist
     if (adzunaAppId && adzunaAppKey) {
@@ -436,7 +493,6 @@ export async function POST(req: NextRequest) {
     }
 
     // 5. STAGE 1: AI Relevance Gatekeeper pipeline
-    // Uses a fast LLM validation request to separate genuine job postings from blog spam, guidebooks, and unrelated indexes.
     const provider = getProvider(providerName);
     
     const gatekeeperPrompt = `

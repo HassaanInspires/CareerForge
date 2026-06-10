@@ -333,6 +333,8 @@ export default function JobAgentPage() {
                   ? '💼 via Adzuna' 
                   : job.source === 'themuse' 
                   ? '🎨 via The Muse' 
+                  : job.source === 'remoteok'
+                  ? '🌴 via RemoteOK'
                   : '🔍 via DuckDuckGo'}
               </span>
             </div>

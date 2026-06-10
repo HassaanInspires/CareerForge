@@ -312,8 +312,8 @@ export default function SettingsPage() {
 
             <div className="flex flex-col sm:flex-row sm:items-start gap-4 p-4 rounded-xl border border-[var(--color-border-light)] bg-[rgba(255,255,255,0.02)]">
               <div className="sm:w-1/4 pt-2">
-                <label className="font-medium text-[var(--color-text-secondary)]">Adzuna API Credentials</label>
-                <span className="block text-[10px] text-[var(--color-text-disabled)] mt-1">Get free App ID and App Key at <a href="https://developer.adzuna.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-white">developer.adzuna.com</a></span>
+                <label className="font-medium text-[var(--color-text-secondary)]">Adzuna API (Optional)</label>
+                <span className="block text-[10px] text-[var(--color-text-disabled)] mt-1">Get free App ID and App Key (Optional, requires developer signup) at <a href="https://developer.adzuna.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-white">developer.adzuna.com</a></span>
               </div>
               <div className="sm:w-3/4 space-y-3">
                 <input
