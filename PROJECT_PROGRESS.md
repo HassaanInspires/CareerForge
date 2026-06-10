@@ -166,6 +166,13 @@ Started with:
     *   **Strict Local Keyword Match Scoring**: Added a relevance density scoring algorithm (`relevanceScore = (titleMatches * 5) + descriptionMatches`) to filter out jobs with a score of 0.
     *   **Relevance-First Sorting**: Ordered the final combined listings primarily by keyword relevance score (descending) and secondarily by date freshness (newest first).
 
+### Phase 21: GitHub Repository AI Technical Audit & Profile Visualizer (V17.0)
+*   **Objective**: Enrich connected GitHub proof-of-work repositories by fetching README files, analyzing codebase technologies/architecture via parallel LLMs, and presenting detailed project cards.
+*   **Implementation**:
+    *   **README Fetch & Decode**: Enabled the backend to download public repository `README.md` contents, decoding base64 blocks and preparing snippets for analysis.
+    *   **Parallel Technical Auditing**: Triggered parallel AI audits of the top 5 most recently active repositories, extracting summaries, technologies, architecture, and complexity levels.
+    *   **Advanced Profile Cards**: Replaced basic grid displays with glassmorphic cards rendering verified tags, architecture quotes, and complexity indicators.
+
 ---
 
 ## 3. Code Modifications & Repository Health

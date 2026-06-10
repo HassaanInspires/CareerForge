@@ -591,24 +591,80 @@ export default function ProfileHub() {
 
                 {memory.proofOfWork && memory.proofOfWork.length > 0 ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                    {memory.proofOfWork.map((pow) => (
-                      <div key={pow.id} className="p-4 rounded-xl border border-[var(--color-border-light)] bg-[rgba(255,255,255,0.01)] hover:bg-[rgba(255,255,255,0.03)] transition-all">
-                        <div className="flex justify-between items-start mb-2">
-                          <span className="text-xs px-2 py-0.5 rounded font-bold uppercase bg-[rgba(143,0,255,0.1)] text-[var(--color-accent-purple)] border border-[var(--color-accent-purple)]">
-                            {pow.type.replace('_', ' ')}
-                          </span>
-                          {pow.metrics?.language && <span className="text-xs text-[var(--color-text-secondary)] font-mono">{pow.metrics.language}</span>}
+                    {memory.proofOfWork.map((pow) => {
+                      const hasAiAudit = !!pow.metrics?.aiSummary;
+                      const complexity = pow.metrics?.aiComplexity || 'Simple';
+                      const complexityColors = 
+                        complexity === 'Advanced' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
+                        complexity === 'Moderate' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                        'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+
+                      return (
+                        <div key={pow.id} className="p-5 rounded-xl border border-[var(--color-border-light)] bg-[rgba(255,255,255,0.01)] hover:bg-[rgba(255,255,255,0.02)] transition-all flex flex-col justify-between">
+                          <div>
+                            {/* Header row: type, complexity & language */}
+                            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                              <span className="text-xs px-2 py-0.5 rounded font-bold uppercase bg-[rgba(143,0,255,0.1)] text-[var(--color-accent-purple)] border border-[var(--color-accent-purple)]">
+                                {pow.type.replace('_', ' ')}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full border ${complexityColors} font-semibold uppercase tracking-wider`}>
+                                  {complexity}
+                                </span>
+                                {pow.metrics?.language && (
+                                  <span className="text-xs text-[var(--color-text-secondary)] font-mono">
+                                    {pow.metrics.language}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Title with link */}
+                            <h4 className="text-base font-bold text-white mb-2">
+                              <a href={pow.url} target="_blank" rel="noopener noreferrer" className="hover:underline hover:text-[var(--color-accent-blue)]">
+                                {pow.title}
+                              </a>
+                            </h4>
+
+                            {/* Description / AI Summary */}
+                            <p className="text-xs text-[var(--color-text-secondary)] mb-3 leading-relaxed">
+                              {pow.metrics?.aiSummary || pow.description}
+                            </p>
+
+                            {/* AI Architecture Audit */}
+                            {pow.metrics?.aiArchitecture && (
+                              <div className="text-[11px] text-[rgba(255,255,255,0.45)] italic bg-[rgba(0,0,0,0.15)] p-2 rounded border border-[rgba(255,255,255,0.03)] mb-3">
+                                🏗️ <strong>Architecture:</strong> {pow.metrics.aiArchitecture}
+                              </div>
+                            )}
+
+                            {/* AI Skills/Technologies badges */}
+                            {pow.metrics?.aiSkills && Array.isArray(pow.metrics.aiSkills) && pow.metrics.aiSkills.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5 mb-4">
+                                {pow.metrics.aiSkills.map((skill: string, sIdx: number) => (
+                                  <span key={sIdx} className="text-[10px] px-2 py-0.5 rounded bg-[rgba(255,255,255,0.05)] text-[var(--color-text-secondary)] border border-[rgba(255,255,255,0.03)] font-mono">
+                                    {skill}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Footer row: stats */}
+                          <div className="flex justify-between items-center pt-2 border-t border-[rgba(255,255,255,0.04)] text-xs text-[var(--color-text-disabled)] font-mono">
+                            <div className="flex gap-3">
+                              {pow.metrics?.stars !== undefined && <span>⭐ {pow.metrics.stars}</span>}
+                              {pow.metrics?.forks !== undefined && <span>🍴 {pow.metrics.forks}</span>}
+                            </div>
+                            {hasAiAudit && (
+                              <span className="text-[10px] text-[var(--color-accent-blue)] font-bold">
+                                🤖 AI Audited
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <h4 className="text-sm font-semibold text-white truncate mb-1">
-                          <a href={pow.url} target="_blank" rel="noopener noreferrer" className="hover:underline hover:text-[var(--color-accent-blue)]">{pow.title}</a>
-                        </h4>
-                        <p className="text-xs text-[var(--color-text-secondary)] line-clamp-2 mb-3">{pow.description}</p>
-                        <div className="flex gap-3 text-xs font-mono text-[var(--color-text-disabled)]">
-                          {pow.metrics?.stars !== undefined && <span>⭐ {pow.metrics.stars}</span>}
-                          {pow.metrics?.forks !== undefined && <span>🍴 {pow.metrics.forks}</span>}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <p className="text-sm text-[var(--color-text-disabled)] italic text-center py-6 bg-[rgba(255,255,255,0.01)] rounded-xl border border-dashed border-[var(--color-border-light)] mb-6">

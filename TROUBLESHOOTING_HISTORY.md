@@ -18,6 +18,7 @@ This document serves as a comprehensive history of the core problems, bugs, side
 | **8. Stale/Out-of-Date Search Postings** | API feeds were merged sequentially without sorting, leaving new keyless postings cut off at the bottom. | Search results showed old/stale jobs rather than the latest postings. | Normalized dates across all engines and sorted all combined jobs chronologically. | ✅ Fixed |
 | **9. Job List Size Cut-Down** | AI Relevance Gatekeeper filtered out non-matching jobs, reducing output below requested 6/12 limits. | Roster page returned very few jobs (e.g. 1 or 2 instead of 6/12). | Implemented an automated fuzzy-matched backfill safety fallback. | ✅ Fixed |
 | **10. Irrelevant Crawl Bloat** | General API feeds (Arbeitnow) imported non-matching jobs, while quoted query formats caused search engines to return empty lists. | Roster was flooded with unrelated local positions (e.g., German-language SEO editors and electro-technical leads). | Switched to unquoted query formats, calculated a match density score, and strictly filtered out 0-match listings. | ✅ Fixed |
+| **11. GitHub Connection Lacks Codebase Audits** | The GitHub integration only fetched generic metadata (stars, language) without inspecting repository source code or markdown files. | Portfolios lacked deep technical descriptions, stack breakdowns, and architectural analysis. | Enabled README.md fetching/decoding and added parallel LLM technical audits for the top 5 repos. | ✅ Fixed |
 
 ---
 
@@ -95,3 +96,11 @@ This document serves as a comprehensive history of the core problems, bugs, side
     *   Implemented a local `calculateRelevanceScore` keyword density scorer.
     *   Strictly discarded any job listing with a relevance score of 0 (no matching keywords).
     *   Sorted listings primarily by match relevance score (descending) and secondarily by date freshness (newest first).
+
+### 11. GitHub Connection Lacks Codebase Audits
+*   **The Symptom**: Connecting a GitHub account imported repositories with only basic title and stars metrics, failing to extract the candidate's actual skills or tech stack usage.
+*   **The Root Cause**: The integration did not fetch README.md files or run codebase-level semantic parsing.
+*   **The Fix**:
+    *   Added README.md retrieval and decoded base64 contents inside `app/api/github/route.ts`.
+    *   Integrated parallel LLM technical audits to extract structured metrics (`aiSummary`, `aiSkills`, `aiArchitecture`, and `aiComplexity`).
+    *   Redesigned the portfolio UI cards to visually render tech badges, architecture details, and project complexity ratings.
