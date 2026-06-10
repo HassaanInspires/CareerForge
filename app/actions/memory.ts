@@ -80,6 +80,59 @@ export async function saveUserMemory(memory: CandidateMemory) {
 
   if (!user) throw new Error('User not found');
 
+  // Load existing proof of work items from DB to ensure complete sync
+  const dbPow = await prisma.proofOfWork.findMany({
+    where: { userId: user.id }
+  });
+
+  const allPow = [...(memory.proofOfWork || [])];
+  dbPow.forEach(p => {
+    if (!allPow.some(x => x.title === p.title)) {
+      let metrics = {};
+      try { metrics = JSON.parse(p.metrics || '{}'); } catch(e) {}
+      allPow.push({
+        id: p.id,
+        type: p.type as any,
+        title: p.title,
+        description: p.description || '',
+        url: p.url || '',
+        verifiedAt: p.verifiedAt.toISOString(),
+        metrics
+      });
+    }
+  });
+
+  // Extract skills and metrics from all ProofOfWork items
+  const gitSkills: string[] = [];
+  const gitMetrics: string[] = [];
+
+  allPow.forEach(pow => {
+    if (pow.metrics?.aiSkills && Array.isArray(pow.metrics.aiSkills)) {
+      pow.metrics.aiSkills.forEach((s: string) => {
+        const cleanSkill = s.trim();
+        if (cleanSkill && !gitSkills.includes(cleanSkill)) {
+          gitSkills.push(cleanSkill);
+        }
+      });
+    }
+    const stars = pow.metrics?.stars || 0;
+    const complexity = pow.metrics?.aiComplexity || 'Simple';
+    const summary = pow.metrics?.aiSummary || pow.description || '';
+    const metricStr = `Verified GitHub Project: ${pow.title} (${complexity} Complexity, ${stars} ⭐). ${summary}`;
+    
+    // Check if a similar metric statement is already included
+    if (!gitMetrics.some(m => m.startsWith(`Verified GitHub Project: ${pow.title}`))) {
+      gitMetrics.push(metricStr);
+    }
+  });
+
+  // Merge with existing coreSkills and verifiableMetrics, keeping them unique
+  const mergedSkills = Array.from(new Set([...(memory.coreSkills || []), ...gitSkills]));
+  
+  // Keep original non-github metrics, and append gitMetrics
+  const nonGitMetrics = (memory.verifiableMetrics || []).filter(m => !m.startsWith('Verified GitHub Project:'));
+  const mergedMetrics = Array.from(new Set([...nonGitMetrics, ...gitMetrics]));
+
   // Update memory
   await prisma.candidateMemory.upsert({
     where: { userId: user.id },
@@ -87,8 +140,8 @@ export async function saveUserMemory(memory: CandidateMemory) {
       userId: user.id,
       careerLevel: memory.careerLevel,
       careerGoals: memory.careerGoals,
-      coreSkills: JSON.stringify(memory.coreSkills || []),
-      verifiableMetrics: JSON.stringify(memory.verifiableMetrics || []),
+      coreSkills: JSON.stringify(mergedSkills),
+      verifiableMetrics: JSON.stringify(mergedMetrics),
       identifiedGaps: JSON.stringify(memory.identifiedGaps || []),
       dataSufficiencyScore: memory.dataSufficiencyScore || 0,
       resumeFileName: memory.resumeFileName || null,
@@ -98,8 +151,8 @@ export async function saveUserMemory(memory: CandidateMemory) {
     update: {
       careerLevel: memory.careerLevel,
       careerGoals: memory.careerGoals,
-      coreSkills: JSON.stringify(memory.coreSkills || []),
-      verifiableMetrics: JSON.stringify(memory.verifiableMetrics || []),
+      coreSkills: JSON.stringify(mergedSkills),
+      verifiableMetrics: JSON.stringify(mergedMetrics),
       identifiedGaps: JSON.stringify(memory.identifiedGaps || []),
       dataSufficiencyScore: memory.dataSufficiencyScore || 0,
       resumeFileName: memory.resumeFileName !== undefined ? memory.resumeFileName : undefined,

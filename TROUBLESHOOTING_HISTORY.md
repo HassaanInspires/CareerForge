@@ -19,6 +19,7 @@ This document serves as a comprehensive history of the core problems, bugs, side
 | **9. Job List Size Cut-Down** | AI Relevance Gatekeeper filtered out non-matching jobs, reducing output below requested 6/12 limits. | Roster page returned very few jobs (e.g. 1 or 2 instead of 6/12). | Implemented an automated fuzzy-matched backfill safety fallback. | ✅ Fixed |
 | **10. Irrelevant Crawl Bloat** | General API feeds (Arbeitnow) imported non-matching jobs, while quoted query formats caused search engines to return empty lists. | Roster was flooded with unrelated local positions (e.g., German-language SEO editors and electro-technical leads). | Switched to unquoted query formats, calculated a match density score, and strictly filtered out 0-match listings. | ✅ Fixed |
 | **11. GitHub Connection Lacks Codebase Audits** | The GitHub integration only fetched generic metadata (stars, language) without inspecting repository source code or markdown files. | Portfolios lacked deep technical descriptions, stack breakdowns, and architectural analysis. | Enabled README.md fetching/decoding and added parallel LLM technical audits for the top 5 repos. | ✅ Fixed |
+| **12. Mobile Layout & Static Memory Graph** | Header navigation links were hidden on mobile screens, and memory graph skills and metrics were static. | Mobile users couldn't navigate the platform or manually edit/sync their skills. | Built a toggleable Hamburger button and responsive overlay, created inline builders with remove buttons, and synced GitHub repos. | ✅ Fixed |
 
 ---
 
@@ -104,3 +105,12 @@ This document serves as a comprehensive history of the core problems, bugs, side
     *   Added README.md retrieval and decoded base64 contents inside `app/api/github/route.ts`.
     *   Integrated parallel LLM technical audits to extract structured metrics (`aiSummary`, `aiSkills`, `aiArchitecture`, and `aiComplexity`).
     *   Redesigned the portfolio UI cards to visually render tech badges, architecture details, and project complexity ratings.
+
+### 12. Mobile Layout & Static Memory Graph
+*   **The Symptom**: Users on mobile devices had no way to navigate between pages (Profile Hub, Builder, Job Hunt Agent, etc.) because the nav links were hidden. Additionally, the Profile Hub's skills and verifiable metrics were read-only and didn't automatically ingest connected GitHub repos.
+*   **The Root Cause**: The CSS class `hidden md:flex` hid the nav links on mobile, but no Hamburger or mobile drawer was provided. Similarly, the Profile Hub loaded CandidateMemory fields directly from the database without offering interactive inputs or syncing proof-of-work skills.
+*   **The Fix**:
+    *   Created a responsive Hamburger button and a slide-down glassmorphic menu in `components/SiteLayout.tsx`.
+    *   Added custom tag builders and list input fields under the "Long-Term Memory Graph" card in `app/profile/page.tsx`, directly wired to update and trigger server-side database saves.
+    *   Updated `saveUserMemory` server action to automatically read connected `ProofOfWork` items, extract skills (`aiSkills`), format project milestones, and merge them cleanly into the user's permanent memory profile.
+

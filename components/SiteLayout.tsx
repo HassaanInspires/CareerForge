@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
@@ -8,6 +8,7 @@ import { useSession, signOut } from 'next-auth/react';
 export default function SiteLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { data: session, status } = useSession();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Pages like login/register can have custom layout if needed, but a unified header/footer still adds high trust.
   const isAuthPage = pathname === '/login' || pathname === '/register';
@@ -81,33 +82,73 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
                 <span className="hidden sm:inline text-xs text-[var(--color-text-secondary)] font-mono">
                   {session.user?.email}
                 </span>
-                <button
-                  onClick={() => signOut({ callbackUrl: '/' })}
-                  className="btn-secondary text-xs px-3 py-1.5 border-[var(--color-border-medium)]"
-                >
-                  Sign Out
-                </button>
-              </>
-            ) : status === 'unauthenticated' ? (
-              <>
-                <Link href="/login" className="text-sm font-medium text-[var(--color-text-secondary)] hover:text-white transition-colors">
-                  Sign In
-                </Link>
-                <Link href="/register" className="btn-primary text-sm px-4 py-2">
-                  Get Started
-                </Link>
-              </>
-            ) : (
-              <div className="w-6 h-6 border-2 border-t-transparent border-[var(--color-text-secondary)] rounded-full animate-spin-slow"></div>
-            )}
-          </div>
-        </div>
-      </header>
+                  <button
+                    onClick={() => signOut({ callbackUrl: '/' })}
+                    className="btn-secondary text-xs px-3 py-1.5 border-[var(--color-border-medium)]"
+                  >
+                    Sign Out
+                  </button>
+                </>
+              ) : status === 'unauthenticated' ? (
+                <>
+                  <Link href="/login" className="text-sm font-medium text-[var(--color-text-secondary)] hover:text-white transition-colors">
+                    Sign In
+                  </Link>
+                  <Link href="/register" className="btn-primary text-sm px-4 py-2">
+                    Get Started
+                  </Link>
+                </>
+              ) : (
+                <div className="w-6 h-6 border-2 border-t-transparent border-[var(--color-text-secondary)] rounded-full animate-spin-slow"></div>
+              )}
 
-      {/* Main Content Area */}
-      <main className="flex-1 relative z-10 flex flex-col">
-        {children}
-      </main>
+              {/* Mobile Hamburger Button */}
+              {session && (
+                <button
+                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                  className="md:hidden p-2 text-[var(--color-text-secondary)] hover:text-white rounded-lg focus:outline-none"
+                  aria-label="Toggle navigation"
+                >
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    {mobileMenuOpen ? (
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    ) : (
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                    )}
+                  </svg>
+                </button>
+              )}
+            </div>
+          </div>
+        </header>
+
+        {/* Mobile Navigation Dropdown */}
+        {mobileMenuOpen && session && (
+          <div className="md:hidden border-b border-[var(--color-border-light)] bg-[var(--color-bg-primary)]/95 backdrop-blur-md px-6 py-4 space-y-2 flex flex-col sticky top-16 left-0 right-0 z-40 shadow-2xl">
+            {navLinks.map((link) => {
+              const isActive = pathname === link.href;
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`text-sm font-medium py-2 px-3 rounded-lg transition-all ${
+                    isActive
+                      ? 'bg-[rgba(255,255,255,0.06)] text-white border-l-4 border-[var(--color-accent-blue)] pl-2 font-bold'
+                      : 'text-[var(--color-text-secondary)] hover:text-white hover:bg-[rgba(255,255,255,0.02)]'
+                  }`}
+                >
+                  {link.name}
+                </Link>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Main Content Area */}
+        <main className="flex-1 relative z-10 flex flex-col">
+          {children}
+        </main>
 
       {/* Footer */}
       <footer className="relative z-10 border-t border-[var(--color-border-light)] bg-black/60 backdrop-blur-sm mt-auto">

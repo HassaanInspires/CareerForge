@@ -51,6 +51,73 @@ export default function ProfileHub() {
   const [githubError, setGithubError] = useState('');
   const [hasKeys, setHasKeys] = useState(true);
 
+  // Custom interactive memory editor states
+  const [newSkill, setNewSkill] = useState('');
+  const [newMetric, setNewMetric] = useState('');
+  const [careerGoals, setCareerGoals] = useState('');
+
+  useEffect(() => {
+    if (memory) {
+      setCareerGoals(memory.careerGoals || '');
+    }
+  }, [memory]);
+
+  const handleAddSkill = async () => {
+    if (!newSkill.trim() || !memory) return;
+    const skill = newSkill.trim();
+    if (memory.coreSkills.includes(skill)) return;
+    const updated = {
+      ...memory,
+      coreSkills: [...memory.coreSkills, skill]
+    };
+    setMemory(updated);
+    setNewSkill('');
+    await saveUserMemory(updated);
+  };
+
+  const handleRemoveSkill = async (skillToRemove: string) => {
+    if (!memory) return;
+    const updated = {
+      ...memory,
+      coreSkills: memory.coreSkills.filter(s => s !== skillToRemove)
+    };
+    setMemory(updated);
+    await saveUserMemory(updated);
+  };
+
+  const handleAddMetric = async () => {
+    if (!newMetric.trim() || !memory) return;
+    const metric = newMetric.trim();
+    if (memory.verifiableMetrics.includes(metric)) return;
+    const updated = {
+      ...memory,
+      verifiableMetrics: [...memory.verifiableMetrics, metric]
+    };
+    setMemory(updated);
+    setNewMetric('');
+    await saveUserMemory(updated);
+  };
+
+  const handleRemoveMetric = async (indexToRemove: number) => {
+    if (!memory) return;
+    const updated = {
+      ...memory,
+      verifiableMetrics: memory.verifiableMetrics.filter((_, idx) => idx !== indexToRemove)
+    };
+    setMemory(updated);
+    await saveUserMemory(updated);
+  };
+
+  const handleSaveGoals = async () => {
+    if (!memory) return;
+    const updated = {
+      ...memory,
+      careerGoals
+    };
+    setMemory(updated);
+    await saveUserMemory(updated);
+  };
+
   useEffect(() => {
     if (status === 'unauthenticated') {
       window.location.href = '/login';
@@ -532,12 +599,22 @@ export default function ProfileHub() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <h3 className="text-sm font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider mb-3">Core Skills</h3>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2 mb-3">
                       {memory.coreSkills.length > 0 ? memory.coreSkills.map((s, i) => (
-                        <span key={i} className="badge">{s}</span>
+                        <span key={i} className="badge flex items-center gap-1.5 pr-2 py-1 bg-[rgba(255,255,255,0.05)] border border-[var(--color-border-light)] text-white">
+                          {s}
+                          <button 
+                            onClick={() => handleRemoveSkill(s)} 
+                            type="button" 
+                            className="text-xs text-[var(--color-text-disabled)] hover:text-red-400 font-bold transition-colors"
+                            title={`Remove ${s}`}
+                          >
+                            &times;
+                          </button>
+                        </span>
                       )) : (
-                        <div className="flex flex-col gap-2">
-                          <span className="text-sm text-[var(--color-text-disabled)]">No skills extracted yet.</span>
+                        <div className="flex flex-col gap-2 w-full">
+                          <span className="text-sm text-[var(--color-text-disabled)] italic">No skills extracted yet.</span>
                           <button 
                             onClick={handleAnalyzeCV}
                             className="text-xs font-bold text-[var(--color-accent-blue)] hover:underline self-start font-mono"
@@ -548,18 +625,50 @@ export default function ProfileHub() {
                         </div>
                       )}
                     </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Add custom skill..."
+                        value={newSkill}
+                        onChange={(e) => setNewSkill(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddSkill();
+                          }
+                        }}
+                        className="input-field text-xs py-1.5 px-3"
+                      />
+                      <button 
+                        onClick={handleAddSkill} 
+                        type="button" 
+                        className="btn-secondary text-xs py-1.5 px-3"
+                      >
+                        + Add
+                      </button>
+                    </div>
                   </div>
 
                   <div>
                     <h3 className="text-sm font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider mb-3">Verifiable Metrics</h3>
-                    <ul className="space-y-2">
+                    <ul className="space-y-2 mb-3">
                       {memory.verifiableMetrics.length > 0 ? memory.verifiableMetrics.map((m, i) => (
-                        <li key={i} className="text-sm text-white flex items-start gap-2">
-                          <span className="text-[var(--color-success)] mt-0.5">✓</span>
-                          <span>{m}</span>
+                        <li key={i} className="text-sm text-white flex items-start justify-between gap-3 p-2.5 rounded-lg bg-[rgba(255,255,255,0.02)] border border-[var(--color-border-light)] hover:bg-[rgba(255,255,255,0.03)] transition-all">
+                          <div className="flex items-start gap-2">
+                            <span className="text-[var(--color-success)] mt-0.5 font-bold">✓</span>
+                            <span className="leading-relaxed">{m}</span>
+                          </div>
+                          <button 
+                            onClick={() => handleRemoveMetric(i)} 
+                            type="button" 
+                            className="text-xs text-[var(--color-text-secondary)] hover:text-red-400 p-1 transition-colors"
+                            title="Remove metric"
+                          >
+                            🗑️
+                          </button>
                         </li>
                       )) : (
-                        <li className="text-sm text-[var(--color-text-disabled)] flex flex-col gap-2">
+                        <li className="text-sm text-[var(--color-text-disabled)] italic flex flex-col gap-2">
                           <span>No metrics extracted yet.</span>
                           <button 
                             onClick={handleAnalyzeCV}
@@ -571,12 +680,46 @@ export default function ProfileHub() {
                         </li>
                       )}
                     </ul>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Add custom achievement or metric (e.g. Optimized database performance by 40%)..."
+                        value={newMetric}
+                        onChange={(e) => setNewMetric(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddMetric();
+                          }
+                        }}
+                        className="input-field text-xs py-1.5 px-3 flex-1"
+                      />
+                      <button 
+                        onClick={handleAddMetric} 
+                        type="button" 
+                        className="btn-secondary text-xs py-1.5 px-3 whitespace-nowrap"
+                      >
+                        + Add Metric
+                      </button>
+                    </div>
                   </div>
                 </div>
                 
-                <div className="mt-6 pt-6 border-t border-[var(--color-border-medium)]">
-                  <h3 className="text-sm font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider mb-3">Career Goals</h3>
-                  <p className="text-sm text-white bg-[var(--color-bg-tertiary)] p-3 rounded">{memory.careerGoals || "Not defined. Tell the Memory Manager your goals!"}</p>
+                <div className="mt-6 pt-6 border-t border-[var(--color-border-medium)] flex flex-col gap-3">
+                  <h3 className="text-sm font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">Career Goals</h3>
+                  <textarea 
+                    value={careerGoals}
+                    onChange={(e) => setCareerGoals(e.target.value)}
+                    placeholder="Enter your professional/career goals..."
+                    className="input-field text-sm w-full h-24 p-3 leading-relaxed"
+                  />
+                  <button 
+                    onClick={handleSaveGoals} 
+                    type="button" 
+                    className="btn-primary text-xs py-1.5 px-4 self-start"
+                  >
+                    Save Goals
+                  </button>
                 </div>
               </div>
 
