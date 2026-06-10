@@ -179,6 +179,8 @@ Started with:
     *   **Interactive Tag/List Editors**: Created custom inline tag and list components with add/remove handles and text inputs in `app/profile/page.tsx`, directly binding them to database-save server actions.
     *   **GitHub Memory Synchronizer**: Updated `saveUserMemory` server action to automatically load all connected `ProofOfWork` items, extract skills, format project metrics, and merge them cleanly into the user's permanent `coreSkills` and `verifiableMetrics`.
     *   **Responsive Header Hamburger**: Integrated a toggleable Hamburger button and responsive glassmorphic dropdown list inside `SiteLayout.tsx` for mobile viewports.
+    *   **Authoritative GitHub Sync & Deletes**: Enabled deletion of individual repository records, and added a manual "Sync & Re-Audit All" control on the dashboard.
+    *   **Full AI Vector Synchronization**: Built `syncVectorProofOfWork` to embed repository metadata (descriptions, technologies, stars, and architectures) into the `CareerChunk` vector table, ensuring all matching engines query connected PoW evidence.
 
 ---
 

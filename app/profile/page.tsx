@@ -19,7 +19,8 @@ import {
   saveUserChatLog,
   loadUserSettings,
   deleteUserResume,
-  saveUserResumeFile
+  saveUserResumeFile,
+  deleteUserPoW
 } from '@/app/actions/memory';
 import { useSession } from 'next-auth/react';
 
@@ -436,6 +437,8 @@ export default function ProfileHub() {
     if (!githubUser.trim()) return;
     setIsFetchingGithub(true);
     setGithubError('');
+    setSuccessMsg('');
+    setError('');
     try {
       const res = await fetch('/api/github', {
         method: 'POST',
@@ -448,9 +451,88 @@ export default function ProfileHub() {
       const newMemory = { ...memory!, proofOfWork: [...(memory?.proofOfWork || []), ...data.proofOfWork] };
       setMemory(newMemory);
       await saveUserMemory(newMemory);
+
+      // Reload updated memory to get merged coreSkills and verifiableMetrics
+      const updatedMem = await loadUserMemory();
+      if (updatedMem) {
+        setMemory(updatedMem);
+      }
       setGithubUser('');
+      setSuccessMsg('GitHub repositories connected, technical audits completed, and successfully synchronized with your career memory graph!');
     } catch (err: any) {
       setGithubError(err.message);
+      setError(err.message);
+    } finally {
+      setIsFetchingGithub(false);
+    }
+  };
+
+  const handleSyncAllRepos = async () => {
+    if (!memory || !memory.proofOfWork || memory.proofOfWork.length === 0) {
+      setGithubError('No connected repositories to sync.');
+      return;
+    }
+    setIsFetchingGithub(true);
+    setGithubError('');
+    setSuccessMsg('');
+    setError('');
+    try {
+      const sampleUrl = memory.proofOfWork[0].url;
+      const match = sampleUrl.match(/github\.com\/([^/]+)/);
+      if (!match) throw new Error('Could not determine GitHub username from connected repositories.');
+      const username = match[1];
+
+      const res = await fetch('/api/github', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      const newMemory = { ...memory, proofOfWork: data.proofOfWork };
+      setMemory(newMemory);
+      await saveUserMemory(newMemory);
+
+      // Reload updated memory
+      const updatedMem = await loadUserMemory();
+      if (updatedMem) {
+        setMemory(updatedMem);
+      }
+      setSuccessMsg('GitHub repositories and long-term memory graph synchronized successfully!');
+    } catch (err: any) {
+      setGithubError(err.message);
+      setError(err.message);
+    } finally {
+      setIsFetchingGithub(false);
+    }
+  };
+
+  const handleDeletePoW = async (powId: string) => {
+    if (!memory) return;
+    setIsFetchingGithub(true);
+    setGithubError('');
+    setSuccessMsg('');
+    setError('');
+    try {
+      const updatedPoW = memory.proofOfWork?.filter(item => item.id !== powId) || [];
+      const updated = {
+        ...memory,
+        proofOfWork: updatedPoW
+      };
+      setMemory(updated);
+
+      await deleteUserPoW(powId);
+      await saveUserMemory(updated);
+
+      const updatedMem = await loadUserMemory();
+      if (updatedMem) {
+        setMemory(updatedMem);
+      }
+      setSuccessMsg('Repository removed and career memory graph updated successfully.');
+    } catch (err: any) {
+      setGithubError(err.message);
+      setError(err.message);
     } finally {
       setIsFetchingGithub(false);
     }
@@ -730,6 +812,16 @@ export default function ProfileHub() {
                     <h2 className="text-xl font-bold text-white mb-1">Verified Proof of Work</h2>
                     <p className="text-sm text-[var(--color-text-secondary)]">Public evidence of your capabilities.</p>
                   </div>
+                  {memory.proofOfWork && memory.proofOfWork.length > 0 && (
+                    <button
+                      onClick={handleSyncAllRepos}
+                      disabled={isFetchingGithub}
+                      className="btn-secondary text-xs py-1 px-3 flex items-center gap-1.5"
+                      title="Sync and audit all connected repositories"
+                    >
+                      {isFetchingGithub ? 'Syncing...' : '🔄 Sync & Re-Audit All'}
+                    </button>
+                  )}
                 </div>
 
                 {memory.proofOfWork && memory.proofOfWork.length > 0 ? (
@@ -793,17 +885,28 @@ export default function ProfileHub() {
                             )}
                           </div>
 
-                          {/* Footer row: stats */}
+                          {/* Footer row: stats & actions */}
                           <div className="flex justify-between items-center pt-2 border-t border-[rgba(255,255,255,0.04)] text-xs text-[var(--color-text-disabled)] font-mono">
                             <div className="flex gap-3">
                               {pow.metrics?.stars !== undefined && <span>⭐ {pow.metrics.stars}</span>}
                               {pow.metrics?.forks !== undefined && <span>🍴 {pow.metrics.forks}</span>}
                             </div>
-                            {hasAiAudit && (
-                              <span className="text-[10px] text-[var(--color-accent-blue)] font-bold">
-                                🤖 AI Audited
-                              </span>
-                            )}
+                            <div className="flex items-center gap-3">
+                              {hasAiAudit && (
+                                <span className="text-[10px] text-[var(--color-success)] font-bold flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-success)] animate-pulse" />
+                                  Synced
+                                </span>
+                              )}
+                              <button
+                                onClick={() => handleDeletePoW(pow.id)}
+                                disabled={isFetchingGithub}
+                                className="text-[10px] font-bold text-[var(--color-text-secondary)] hover:text-red-400 transition-colors flex items-center gap-0.5"
+                                title="Delete repository"
+                              >
+                                🗑️ Delete
+                              </button>
+                            </div>
                           </div>
                         </div>
                       );

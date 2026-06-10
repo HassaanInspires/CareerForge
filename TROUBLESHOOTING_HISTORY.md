@@ -20,6 +20,7 @@ This document serves as a comprehensive history of the core problems, bugs, side
 | **10. Irrelevant Crawl Bloat** | General API feeds (Arbeitnow) imported non-matching jobs, while quoted query formats caused search engines to return empty lists. | Roster was flooded with unrelated local positions (e.g., German-language SEO editors and electro-technical leads). | Switched to unquoted query formats, calculated a match density score, and strictly filtered out 0-match listings. | ✅ Fixed |
 | **11. GitHub Connection Lacks Codebase Audits** | The GitHub integration only fetched generic metadata (stars, language) without inspecting repository source code or markdown files. | Portfolios lacked deep technical descriptions, stack breakdowns, and architectural analysis. | Enabled README.md fetching/decoding and added parallel LLM technical audits for the top 5 repos. | ✅ Fixed |
 | **12. Mobile Layout & Static Memory Graph** | Header navigation links were hidden on mobile screens, and memory graph skills and metrics were static. | Mobile users couldn't navigate the platform or manually edit/sync their skills. | Built a toggleable Hamburger button and responsive overlay, created inline builders with remove buttons, and synced GitHub repos. | ✅ Fixed |
+| **13. GitHub Desync & Vector Exclusion** | Deletions were not propagated to DB, existing metrics were never updated, and repositories were never embedded in pgvector chunks. | Deleting repos in UI didn't persist, stats like stars never refreshed, and other AI tools (RAG) couldn't see GitHub projects. | Switched DB updates to authoritative CRUD, added delete/sync controls, and vector-embedded projects in syncVectorProofOfWork. | ✅ Fixed |
 
 ---
 
@@ -113,4 +114,15 @@ This document serves as a comprehensive history of the core problems, bugs, side
     *   Created a responsive Hamburger button and a slide-down glassmorphic menu in `components/SiteLayout.tsx`.
     *   Added custom tag builders and list input fields under the "Long-Term Memory Graph" card in `app/profile/page.tsx`, directly wired to update and trigger server-side database saves.
     *   Updated `saveUserMemory` server action to automatically read connected `ProofOfWork` items, extract skills (`aiSkills`), format project milestones, and merge them cleanly into the user's permanent memory profile.
+
+### 13. GitHub Desync & Vector Exclusion
+*   **The Symptom**: Deleting connected GitHub projects in the UI did not persist after page reload. Furthermore, stars/forks stats never updated on sync, and other AI modules (such as TargetMatch resume builder and Chat agent) were completely unaware of connected GitHub projects.
+*   **The Root Cause**:
+    *   The `saveUserMemory` server action used a naive merge strategy that re-loaded all existing DB items. This resurrected deleted repositories. Additionally, it checked for duplicates using `if (!existing)` which prevented updates to stars/forks of existing repositories.
+    *   Connected repositories were never chunked and saved to the `CareerChunk` vector table, excluding them from pgvector RAG searches across the site.
+*   **The Fix**:
+    *   Updated database operations in `saveUserMemory` to run an authoritative differential sync: it deletes database rows no longer in the memory array, updates existing rows with latest descriptions/metrics, and creates new ones.
+    *   Added a manual `deleteUserPoW` action and a `🔄 Sync & Re-Audit All` control in the UI.
+    *   Implemented `syncVectorProofOfWork` to automatically generate vector embeddings for all active projects and insert them as `CareerChunk`s on save.
+
 

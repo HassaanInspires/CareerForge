@@ -4,6 +4,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { CandidateMemory, ProofOfWorkItem } from '@/lib/memory';
+import { generateEmbedding } from '@/lib/vector';
+import crypto from 'crypto';
 
 export async function loadUserMemory(): Promise<CandidateMemory | null> {
   const session = await getServerSession(authOptions);
@@ -80,29 +82,51 @@ export async function saveUserMemory(memory: CandidateMemory) {
 
   if (!user) throw new Error('User not found');
 
-  // Load existing proof of work items from DB to ensure complete sync
+  const allPow = memory.proofOfWork || [];
+
+  // Load existing proof of work items from DB to perform differential updates
   const dbPow = await prisma.proofOfWork.findMany({
     where: { userId: user.id }
   });
 
-  const allPow = [...(memory.proofOfWork || [])];
-  dbPow.forEach(p => {
-    if (!allPow.some(x => x.title === p.title)) {
-      let metrics = {};
-      try { metrics = JSON.parse(p.metrics || '{}'); } catch(e) {}
-      allPow.push({
-        id: p.id,
-        type: p.type as any,
-        title: p.title,
-        description: p.description || '',
-        url: p.url || '',
-        verifiedAt: p.verifiedAt.toISOString(),
-        metrics
-      });
+  // Delete items in database that are no longer present in memory
+  const titlesToKeep = allPow.map(p => p.title);
+  await prisma.proofOfWork.deleteMany({
+    where: {
+      userId: user.id,
+      NOT: {
+        title: { in: titlesToKeep }
+      }
     }
   });
 
-  // Extract skills and metrics from all ProofOfWork items
+  // Create or Update items
+  for (const pow of allPow) {
+    const existing = dbPow.find(p => p.title === pow.title);
+    if (existing) {
+      await prisma.proofOfWork.update({
+        where: { id: existing.id },
+        data: {
+          description: pow.description,
+          url: pow.url,
+          metrics: JSON.stringify(pow.metrics || {})
+        }
+      });
+    } else {
+      await prisma.proofOfWork.create({
+        data: {
+          userId: user.id,
+          type: pow.type,
+          title: pow.title,
+          description: pow.description,
+          url: pow.url,
+          metrics: JSON.stringify(pow.metrics || {})
+        }
+      });
+    }
+  }
+
+  // Extract skills and metrics from all active ProofOfWork items
   const gitSkills: string[] = [];
   const gitMetrics: string[] = [];
 
@@ -120,7 +144,6 @@ export async function saveUserMemory(memory: CandidateMemory) {
     const summary = pow.metrics?.aiSummary || pow.description || '';
     const metricStr = `Verified GitHub Project: ${pow.title} (${complexity} Complexity, ${stars} ⭐). ${summary}`;
     
-    // Check if a similar metric statement is already included
     if (!gitMetrics.some(m => m.startsWith(`Verified GitHub Project: ${pow.title}`))) {
       gitMetrics.push(metricStr);
     }
@@ -129,7 +152,7 @@ export async function saveUserMemory(memory: CandidateMemory) {
   // Merge with existing coreSkills and verifiableMetrics, keeping them unique
   const mergedSkills = Array.from(new Set([...(memory.coreSkills || []), ...gitSkills]));
   
-  // Keep original non-github metrics, and append gitMetrics
+  // Keep original non-github metrics, and append active gitMetrics
   const nonGitMetrics = (memory.verifiableMetrics || []).filter(m => !m.startsWith('Verified GitHub Project:'));
   const mergedMetrics = Array.from(new Set([...nonGitMetrics, ...gitMetrics]));
 
@@ -161,32 +184,8 @@ export async function saveUserMemory(memory: CandidateMemory) {
     }
   });
 
-  // Handle ProofOfWork updates
-  if (memory.proofOfWork && memory.proofOfWork.length > 0) {
-    for (const pow of memory.proofOfWork) {
-      // Check if it exists by URL or title to prevent duplicates (naive approach for now)
-      const existing = await prisma.proofOfWork.findFirst({
-        where: {
-          userId: user.id,
-          title: pow.title,
-          type: pow.type
-        }
-      });
-
-      if (!existing) {
-        await prisma.proofOfWork.create({
-          data: {
-            userId: user.id,
-            type: pow.type,
-            title: pow.title,
-            description: pow.description,
-            url: pow.url,
-            metrics: JSON.stringify(pow.metrics || {})
-          }
-        });
-      }
-    }
-  }
+  // Synchronize vector embeddings for each of the active repositories
+  await syncVectorProofOfWork(user.id, allPow);
 
   return { success: true };
 }
@@ -416,4 +415,65 @@ export async function deleteUserResume() {
   });
 
   return { success: true };
+}
+
+export async function deleteUserPoW(powId: string) {
+  const session = await getServerSession(authOptions);
+  
+  if (!session?.user?.email) {
+    throw new Error('Not authenticated');
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { email: session.user.email }
+  });
+
+  if (!user) throw new Error('User not found');
+
+  await prisma.proofOfWork.delete({
+    where: {
+      id: powId,
+      userId: user.id
+    }
+  });
+
+  return { success: true };
+}
+
+async function syncVectorProofOfWork(userId: string, proofOfWork: ProofOfWorkItem[]) {
+  try {
+    // Delete existing GitHub chunks
+    await prisma.$executeRaw`
+      DELETE FROM "CareerChunk"
+      WHERE "userId" = ${userId} AND "metadata" LIKE 'GitHub Repo:%';
+    `;
+
+    for (const pow of proofOfWork) {
+      const text = `Project Name: ${pow.title}
+Type: GitHub Repository
+Description: ${pow.description || ''}
+Technologies: ${Array.isArray(pow.metrics?.aiSkills) ? pow.metrics.aiSkills.join(', ') : ''}
+Architecture: ${pow.metrics?.aiArchitecture || ''}
+AI Summary: ${pow.metrics?.aiSummary || ''}
+Stats: Stars ${pow.metrics?.stars || 0}, Forks ${pow.metrics?.forks || 0}`;
+
+      const embedding = await generateEmbedding(text);
+      const vectorStr = `[${embedding.join(',')}]`;
+      const uuid = crypto.randomUUID();
+
+      await prisma.$executeRaw`
+        INSERT INTO "CareerChunk" ("id", "userId", "content", "metadata", "embedding", "createdAt")
+        VALUES (
+          ${uuid},
+          ${userId},
+          ${text},
+          ${`GitHub Repo: ${pow.title}`},
+          ${vectorStr}::vector,
+          NOW()
+        );
+      `;
+    }
+  } catch (error) {
+    console.error('Failed to sync vector proof of work:', error);
+  }
 }
