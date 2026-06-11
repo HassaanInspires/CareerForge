@@ -21,6 +21,7 @@ This document serves as a comprehensive history of the core problems, bugs, side
 | **11. GitHub Connection Lacks Codebase Audits** | The GitHub integration only fetched generic metadata (stars, language) without inspecting repository source code or markdown files. | Portfolios lacked deep technical descriptions, stack breakdowns, and architectural analysis. | Enabled README.md fetching/decoding and added parallel LLM technical audits for the top 5 repos. | ✅ Fixed |
 | **12. Mobile Layout & Static Memory Graph** | Header navigation links were hidden on mobile screens, and memory graph skills and metrics were static. | Mobile users couldn't navigate the platform or manually edit/sync their skills. | Built a toggleable Hamburger button and responsive overlay, created inline builders with remove buttons, and synced GitHub repos. | ✅ Fixed |
 | **13. GitHub Desync & Vector Exclusion** | Deletions were not propagated to DB, existing metrics were never updated, and repositories were never embedded in pgvector chunks. | Deleting repos in UI didn't persist, stats like stars never refreshed, and other AI tools (RAG) couldn't see GitHub projects. | Switched DB updates to authoritative CRUD, added delete/sync controls, and vector-embedded projects in syncVectorProofOfWork. | ✅ Fixed |
+| **14. TargetMatch Builder JSON Error** | Bypassed user settings models on custom API keys, fallback model was decommissioned, and no max_tokens limit caused response truncation. | Running Brutal Reality Check returned "Failed to parse AI response. Please try again." | Corrected model resolution in resolveActiveLLM, updated decommissioned Groq models, and configured max_tokens: 4096. | ✅ Fixed |
 
 ---
 
@@ -124,5 +125,17 @@ This document serves as a comprehensive history of the core problems, bugs, side
     *   Updated database operations in `saveUserMemory` to run an authoritative differential sync: it deletes database rows no longer in the memory array, updates existing rows with latest descriptions/metrics, and creates new ones.
     *   Added a manual `deleteUserPoW` action and a `🔄 Sync & Re-Audit All` control in the UI.
     *   Implemented `syncVectorProofOfWork` to automatically generate vector embeddings for all active projects and insert them as `CareerChunk`s on save.
+
+### 14. TargetMatch Builder JSON Parser Error
+*   **The Symptom**: Selecting Groq/Mistral as LLM provider and clicking "Run Brutal Reality Check" resulted in a red error message: "Failed to parse AI response. Please try again."
+*   **The Root Cause**:
+    *   **Settings Model Bypass**: In `resolveActiveLLM` inside `lib/llm-providers.ts`, if database keys were present, the helper immediately returned the resolved key but completely ignored the user's selected model (`dbModels[provider]`) when client requests didn't specify one, directly returning provider defaults.
+  *   **Decommissioned Model Fallback**: Groq decommissioned the `llama3-70b-8192` model. The hardcoded defaults in `getDefaultModelForProvider('groq')` still returned this model, causing a 400 Bad Request error from Groq.
+  *   **Response Truncation**: For OpenAI/Groq/Mistral providers, `callAPI` did not set any `max_tokens` value. The APIs defaulted to small limits, cutting off the JSON response mid-output (e.g. before the final closing brace), which failed regex-based JSON matching.
+*   **The Fix**:
+  *   Updated `resolveActiveLLM` to correctly read `dbModels[requestedProvider]` when custom API keys are present.
+  *   Replaced deprecated Groq models `llama3-70b-8192` and `llama3-8b-8192` with active models `llama-3.3-70b-versatile` and `llama-3.1-8b-instant`.
+  *   Added `max_tokens: 4096` to the API request payload in `OpenAIProvider.callAPI`.
+
 
 

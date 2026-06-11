@@ -182,6 +182,13 @@ Started with:
     *   **Authoritative GitHub Sync & Deletes**: Enabled deletion of individual repository records, and added a manual "Sync & Re-Audit All" control on the dashboard.
     *   **Full AI Vector Synchronization**: Built `syncVectorProofOfWork` to embed repository metadata (descriptions, technologies, stars, and architectures) into the `CareerChunk` vector table, ensuring all matching engines query connected PoW evidence.
 
+### Phase 23: TargetMatch Engine Fix & Groq Model Upgrades (V18.2)
+*   **Objective**: Fix the TargetMatch Engine JSON parsing error, replace decommissioned Groq models with active ones, and fix model resolution overrides.
+*   **Implementation**:
+    *   **Database Model Resolution Bug Fix**: Fixed a bug in `resolveActiveLLM` inside `lib/llm-providers.ts` where user-selected models from database settings were ignored when API keys were present. It now respects `dbModels[provider]`.
+    *   **OpenAI/Groq Token Truncation Fix**: Configured `max_tokens: 4096` in `OpenAIProvider.callAPI` to prevent JSON response truncation under large prompts/thought contexts.
+    *   **Groq Model Upgrades**: Replaced decommissioned `llama3-70b-8192` and `llama3-8b-8192` with `llama-3.3-70b-versatile` and `llama-3.1-8b-instant`.
+
 ---
 
 ## 3. Code Modifications & Repository Health

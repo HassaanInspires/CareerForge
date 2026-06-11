@@ -162,6 +162,7 @@ export class OpenAIProvider implements LLMProvider {
         body: JSON.stringify({
           model,
           messages: [{ role: 'user', content: prompt }],
+          max_tokens: 4096,
         }),
       },
       this.provider
@@ -224,8 +225,8 @@ export class OpenAIProvider implements LLMProvider {
     }
     if (this.provider === 'groq') {
       return [
-        { id: 'llama3-70b-8192', name: 'Llama 3 70B' },
-        { id: 'llama3-8b-8192', name: 'Llama 3 8B' },
+        { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B' },
+        { id: 'llama-3.1-8b-instant', name: 'Llama 3.1 8B' },
         { id: 'mixtral-8x7b-32768', name: 'Mixtral 8x7B' },
       ];
     }
@@ -341,7 +342,7 @@ export function resolveActiveLLM(
   if (requestedKey) {
     return {
       provider: requestedProvider,
-      model: activeModel || getDefaultModelForProvider(requestedProvider),
+      model: activeModel || dbModels[requestedProvider] || getDefaultModelForProvider(requestedProvider),
       apiKey: requestedKey
     };
   }
@@ -375,7 +376,7 @@ export function resolveActiveLLM(
   // 3. Absolute fallback to requested provider if absolutely no keys exist (throws error at caller level)
   return {
     provider: requestedProvider,
-    model: activeModel || getDefaultModelForProvider(requestedProvider),
+    model: activeModel || dbModels[requestedProvider] || getDefaultModelForProvider(requestedProvider),
     apiKey: ''
   };
 }
@@ -385,7 +386,7 @@ export function getDefaultModelForProvider(provider: Provider): string {
     case 'anthropic': return 'claude-3-5-sonnet-20240620';
     case 'openai': return 'gpt-4o';
     case 'gemini': return 'gemini-1.5-flash';
-    case 'groq': return 'llama3-70b-8192';
+    case 'groq': return 'llama-3.3-70b-versatile';
     case 'mistral': return 'mistral-large-latest';
     default: return '';
   }
