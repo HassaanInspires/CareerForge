@@ -549,8 +549,8 @@ export default function ProfileHub() {
               Candidate <span className="text-[var(--color-accent-blue)]">Hub</span>
             </h1>
           </div>
-          <div className="flex gap-4">
-            <Link href="/builder" className="btn-primary py-2 px-4 text-sm">Open Builder</Link>
+          <div className="flex gap-3 md:gap-4">
+            <Link href="/builder" className="btn-primary">Open Builder</Link>
           </div>
         </header>
 
@@ -616,29 +616,29 @@ export default function ProfileHub() {
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <button 
+                  <button
                     onClick={handleDownloadResume}
-                    className="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1.5 font-mono"
+                    className="btn-secondary text-xs"
                   >
                     Download PDF
                   </button>
-                  <button 
+                  <button
                     onClick={handleAnalyzeCV}
-                    className="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1.5 font-mono text-[var(--color-accent-blue)] border-[rgba(0,212,255,0.2)] hover:border-[var(--color-accent-blue)] hover:bg-[rgba(0,212,255,0.05)]"
+                    className="btn-secondary text-xs text-[var(--color-accent-blue)] border-[rgba(0,212,255,0.2)] hover:border-[var(--color-accent-blue)] hover:bg-[rgba(0,212,255,0.05)]"
                     disabled={isUploading}
                   >
                     {isUploading ? 'Analyzing...' : 'Fetch Details'}
                   </button>
-                  <button 
+                  <button
                     onClick={() => document.getElementById('profile-cv-replace-upload')?.click()}
-                    className="btn-secondary py-1.5 px-3 text-xs flex items-center gap-1.5 font-mono"
+                    className="btn-secondary text-xs"
                     disabled={isUploading}
                   >
                     Replace CV
                   </button>
-                  <button 
+                  <button
                     onClick={resetProfile}
-                    className="btn-secondary py-1.5 px-3 text-xs border-red-500/20 hover:border-red-500 hover:bg-red-500/10 text-red-400 flex items-center gap-1.5 font-mono"
+                    className="btn-secondary text-xs border-red-500/20 hover:border-red-500 hover:bg-red-500/10 text-red-400"
                     disabled={isUploading}
                   >
                     Delete
@@ -719,12 +719,12 @@ export default function ProfileHub() {
                             handleAddSkill();
                           }
                         }}
-                        className="input-field text-xs py-1.5 px-3"
+                        className="input-field flex-1"
                       />
-                      <button 
-                        onClick={handleAddSkill} 
-                        type="button" 
-                        className="btn-secondary text-xs py-1.5 px-3"
+                      <button
+                        onClick={handleAddSkill}
+                        type="button"
+                        className="btn-primary"
                       >
                         + Add
                       </button>
@@ -774,12 +774,12 @@ export default function ProfileHub() {
                             handleAddMetric();
                           }
                         }}
-                        className="input-field text-xs py-1.5 px-3 flex-1"
+                        className="input-field flex-1"
                       />
-                      <button 
-                        onClick={handleAddMetric} 
-                        type="button" 
-                        className="btn-secondary text-xs py-1.5 px-3 whitespace-nowrap"
+                      <button
+                        onClick={handleAddMetric}
+                        type="button"
+                        className="btn-primary"
                       >
                         + Add Metric
                       </button>
@@ -798,7 +798,7 @@ export default function ProfileHub() {
                   <button 
                     onClick={handleSaveGoals} 
                     type="button" 
-                    className="btn-primary text-xs py-1.5 px-4 self-start"
+                    className="btn-primary self-start"
                   >
                     Save Goals
                   </button>
@@ -816,7 +816,7 @@ export default function ProfileHub() {
                     <button
                       onClick={handleSyncAllRepos}
                       disabled={isFetchingGithub}
-                      className="btn-secondary text-xs py-1 px-3 flex items-center gap-1.5"
+                      className="btn-secondary text-xs"
                       title="Sync and audit all connected repositories"
                     >
                       {isFetchingGithub ? 'Syncing...' : '🔄 Sync & Re-Audit All'}
@@ -929,7 +929,7 @@ export default function ProfileHub() {
                       className="input-field text-sm"
                       disabled={isFetchingGithub}
                     />
-                    <button type="submit" disabled={isFetchingGithub || !githubUser} className="btn-secondary py-1 px-4 whitespace-nowrap">
+                    <button type="submit" disabled={isFetchingGithub || !githubUser} className="btn-secondary whitespace-nowrap">
                       {isFetchingGithub ? 'Connecting...' : 'Fetch Repos'}
                     </button>
                   </form>
@@ -1026,7 +1026,7 @@ export default function ProfileHub() {
                     placeholder="E.g. I just got my AWS cert..."
                     className="input-field text-sm flex-1"
                   />
-                  <button type="submit" className="btn-primary py-1 px-3" disabled={!chatInput.trim() || isTyping}>Send</button>
+                  <button type="submit" className="btn-primary" disabled={!chatInput.trim() || isTyping}>Send</button>
                 </form>
               </div>
             </div>

@@ -22,11 +22,11 @@ export default function GuidePage() {
   ];
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-12 md:py-20 animate-fade-in">
-      
+    <div className="max-w-7xl mx-auto px-4 md:px-6 py-8 md:py-20 animate-fade-in">
+
       {/* Title */}
-      <div className="mb-12 text-center md:text-left">
-        <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight font-heading text-white mb-4">
+      <div className="mb-8 md:mb-12 text-center md:text-left">
+        <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight font-heading text-white mb-4">
           Platform Documentation & Strategy
         </h1>
         <p className="text-lg text-[var(--color-text-secondary)] max-w-3xl">
@@ -35,36 +35,36 @@ export default function GuidePage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-[var(--color-border-light)] mb-12 overflow-x-auto gap-2">
+      <div className="flex border-b border-[var(--color-border-light)] mb-8 md:mb-12 overflow-x-auto gap-1 md:gap-2">
         <button
           onClick={() => setActiveTab('how-to-use')}
-          className={`py-4 px-6 text-sm font-semibold tracking-wider uppercase font-mono border-b-2 transition-all whitespace-nowrap ${
+          className={`py-3 md:py-4 px-4 md:px-6 text-xs md:text-sm font-semibold tracking-wider uppercase font-mono border-b-2 transition-all whitespace-nowrap ${
             activeTab === 'how-to-use'
               ? 'border-[var(--color-accent-blue)] text-white'
               : 'border-transparent text-[var(--color-text-secondary)] hover:text-white'
           }`}
         >
-          📖 How to Use Section
+          📖 How to Use
         </button>
         <button
           onClick={() => setActiveTab('api-setup')}
-          className={`py-4 px-6 text-sm font-semibold tracking-wider uppercase font-mono border-b-2 transition-all whitespace-nowrap ${
+          className={`py-3 md:py-4 px-4 md:px-6 text-xs md:text-sm font-semibold tracking-wider uppercase font-mono border-b-2 transition-all whitespace-nowrap ${
             activeTab === 'api-setup'
               ? 'border-[var(--color-accent-blue)] text-white'
               : 'border-transparent text-[var(--color-text-secondary)] hover:text-white'
           }`}
         >
-          🔑 API Integration Guide
+          🔑 API Setup Guide
         </button>
         <button
           onClick={() => setActiveTab('critique')}
-          className={`py-4 px-6 text-sm font-semibold tracking-wider uppercase font-mono border-b-2 transition-all whitespace-nowrap ${
+          className={`py-3 md:py-4 px-4 md:px-6 text-xs md:text-sm font-semibold tracking-wider uppercase font-mono border-b-2 transition-all whitespace-nowrap ${
             activeTab === 'critique'
               ? 'border-[var(--color-accent-blue)] text-white'
               : 'border-transparent text-[var(--color-text-secondary)] hover:text-white'
           }`}
         >
-          📊 Strategic Critique & Gap Analysis
+          📊 Critique &amp; Analysis
         </button>
       </div>
 
@@ -76,7 +76,7 @@ export default function GuidePage() {
           <div className="space-y-12 animate-slide-up">
             
             {/* Mission Statement */}
-            <div className="glass-card p-8 bg-gradient-to-r from-zinc-900 to-black">
+            <div className="glass-card p-6 md:p-8 bg-gradient-to-r from-zinc-900 to-black">
               <h2 className="text-2xl font-bold font-heading text-white mb-4">The CareerForge Vision</h2>
               <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed mb-4">
                 The traditional resume is a text file filled with unverified claims, subjective buzzwords, and exaggerated metrics. In the age of generative AI, resume spam is at an all-time high, prompting recruiters to use filters that screen out talented applicants.
@@ -198,7 +198,7 @@ export default function GuidePage() {
           <div className="space-y-8 animate-slide-up max-w-4xl" id="critique">
             
             {/* The Rating Card */}
-            <div className="glass-card p-8 flex flex-col md:flex-row items-center justify-between gap-6 bg-gradient-to-br from-zinc-950 to-zinc-900 border border-[var(--color-border-medium)]">
+            <div className="glass-card p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 bg-gradient-to-br from-zinc-950 to-zinc-900 border border-[var(--color-border-medium)]">
               <div>
                 <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded bg-amber-500/10 text-amber-400 text-xs font-semibold uppercase tracking-wider mb-2">
                   Strategic Evaluation

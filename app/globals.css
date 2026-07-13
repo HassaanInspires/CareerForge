@@ -59,14 +59,14 @@ body {
   border-color: var(--color-border-medium);
 }
 
-/* Professional Buttons */
+/* Professional Buttons — touch-friendly sizing */
 .btn-primary {
   background: var(--color-text-primary);
   color: var(--color-bg-primary);
-  padding: 10px 24px;
+  padding: 12px 24px;
   border-radius: 8px;
   font-weight: 500;
-  font-size: 0.875rem;
+  font-size: 0.9375rem; /* 15px */
   border: 1px solid transparent;
   cursor: pointer;
   transition: all 150ms ease;
@@ -74,6 +74,9 @@ body {
   align-items: center;
   justify-content: center;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  min-height: 44px; /* minimum tap target */
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .btn-primary:hover {
@@ -93,16 +96,19 @@ body {
 .btn-secondary {
   background: transparent;
   color: var(--color-text-primary);
-  padding: 10px 24px;
+  padding: 12px 24px;
   border-radius: 8px;
   font-weight: 500;
-  font-size: 0.875rem;
+  font-size: 0.9375rem;
   border: 1px solid var(--color-border-medium);
   cursor: pointer;
   transition: all 150ms ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  min-height: 44px;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .btn-secondary:hover {
@@ -110,17 +116,18 @@ body {
   border-color: var(--color-text-secondary);
 }
 
-/* Input Fields */
+/* Input Fields — Mobile-first (16px prevents iOS zoom) */
 .input-field {
   background: var(--color-bg-primary);
   border: 1px solid var(--color-border-medium);
   border-radius: 8px;
-  padding: 10px 16px;
+  padding: 12px 16px;
   color: var(--color-text-primary);
-  font-size: 0.875rem;
+  font-size: 1rem; /* 16px — prevents iOS Safari auto-zoom on focus */
   font-family: var(--font-sans);
   transition: all 150ms ease;
   width: 100%;
+  min-height: 44px; /* minimum tap target */
 }
 
 .input-field:focus {
@@ -133,16 +140,28 @@ body {
   color: var(--color-text-disabled);
 }
 
-/* Skill Badges */
+/* Select inputs — same treatment */
+select.input-field {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23a1a1aa' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 12px center;
+  background-repeat: no-repeat;
+  background-size: 20px;
+  padding-right: 40px;
+}
+
+/* Skill Badges — touch-friendly sizing */
 .badge {
   background: var(--color-bg-tertiary);
   border: 1px solid var(--color-border-medium);
   color: var(--color-text-primary);
-  padding: 4px 10px;
-  border-radius: 6px;
-  font-size: 0.75rem;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 0.8125rem; /* 13px */
   font-weight: 500;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
   transition: all 150ms ease;
 }
 
@@ -183,9 +202,121 @@ body {
   to { transform: rotate(360deg); }
 }
 
+/* Slide-in Drawer Animation */
+.animate-slide-in-right {
+  animation: slideInRight 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
 /* Clean up old elements */
 .bg-mesh, .doodles-overlay {
   display: none !important;
+}
+
+/* ===== MOBILE-FIRST UTILITIES ===== */
+
+/* Safe area insets for notched phones */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.pl-safe {
+  padding-left: env(safe-area-inset-left, 0px);
+}
+.pr-safe {
+  padding-right: env(safe-area-inset-right, 0px);
+}
+.px-safe {
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* Mobile safe horizontal padding — use on page-level containers */
+.mobile-padding {
+  padding-left: max(1rem, env(safe-area-inset-left, 0px));
+  padding-right: max(1rem, env(safe-area-inset-right, 0px));
+}
+
+@media (min-width: 768px) {
+  .mobile-padding {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+/* Minimum touch target (44×44px) — for custom interactive elements */
+.touch-target {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Prevent text-size adjust on orientation change */
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Remove tap highlight on mobile */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Better tap highlight for interactive elements */
+a, button, input, select, textarea, label {
+  -webkit-tap-highlight-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Fluid typography scale */
+.text-fluid-hero {
+  font-size: clamp(2rem, 5vw + 0.5rem, 4.5rem); /* 32px → 72px */
+  line-height: 1.1;
+}
+
+.text-fluid-h1 {
+  font-size: clamp(1.75rem, 3vw + 1rem, 3rem); /* 28px → 48px */
+  line-height: 1.2;
+}
+
+.text-fluid-h2 {
+  font-size: clamp(1.5rem, 2.5vw + 0.75rem, 2.25rem); /* 24px → 36px */
+  line-height: 1.25;
+}
+
+.text-fluid-body {
+  font-size: clamp(0.9375rem, 1vw + 0.5rem, 1.125rem); /* 15px → 18px */
+  line-height: 1.6;
+}
+
+/* Responsive container padding */
+.section-padding {
+  padding: clamp(2rem, 4vw + 1rem, 4rem) clamp(1rem, 3vw + 0.5rem, 2rem);
+}
+
+/* Appear on mobile only, hide on tablet+ */
+.mobile-only {
+  display: block;
+}
+@media (min-width: 768px) {
+  .mobile-only {
+    display: none;
+  }
+}
+
+/* Hide on mobile, show on tablet+ */
+.desktop-only {
+  display: none;
+}
+@media (min-width: 768px) {
+  .desktop-only {
+    display: block;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

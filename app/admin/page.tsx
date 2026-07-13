@@ -22,7 +22,7 @@ export default async function AdminPage() {
   });
 
   return (
-    <div className="w-full max-w-6xl mx-auto p-6 md:p-12 font-sans text-white">
+    <div className="w-full max-w-6xl mx-auto p-4 md:p-8 font-sans text-white">
 
       <main className="max-w-6xl mx-auto space-y-8 animate-fade-in">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -45,8 +45,8 @@ export default async function AdminPage() {
         </div>
 
         <div className="glass-card p-0 overflow-hidden">
-          <div className="p-6 bg-[rgba(255,255,255,0.02)] border-b border-[var(--color-border-medium)]">
-            <h2 className="text-xl font-bold text-white">Candidate Verification Roster</h2>
+          <div className="p-4 md:p-6 bg-[rgba(255,255,255,0.02)] border-b border-[var(--color-border-medium)]">
+            <h2 className="text-lg md:text-xl font-bold text-white">Candidate Verification Roster</h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">

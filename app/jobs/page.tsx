@@ -319,14 +319,14 @@ export default function JobAgentPage() {
             </div>
             <div className="flex flex-col items-end gap-1.5">
               <div className="flex gap-2">
-                <span className="text-[10px] px-2 py-0.5 rounded bg-[var(--color-bg-secondary)] border border-[var(--color-border-light)] text-[var(--color-text-secondary)]">
+                <span className="text-xs px-2.5 py-1 rounded bg-[var(--color-bg-secondary)] border border-[var(--color-border-light)] text-[var(--color-text-secondary)]">
                   {job.remoteType}
                 </span>
-                <span className="text-[10px] px-2 py-0.5 rounded bg-[var(--color-bg-secondary)] border border-[var(--color-border-light)] text-[var(--color-text-secondary)]">
+                <span className="text-xs px-2.5 py-1 rounded bg-[var(--color-bg-secondary)] border border-[var(--color-border-light)] text-[var(--color-text-secondary)]">
                   {job.location}
                 </span>
               </div>
-              <span className="text-[9px] uppercase font-mono tracking-wider px-1.5 py-0.5 rounded bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)] text-[var(--color-text-disabled)]">
+              <span className="text-[10px] md:text-xs uppercase font-mono tracking-wider px-2 py-0.5 rounded bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.1)] text-[var(--color-text-disabled)]">
                 {job.source === 'tavily' 
                   ? '🚀 via Tavily' 
                   : job.source === 'adzuna' 
@@ -343,13 +343,13 @@ export default function JobAgentPage() {
           {/* Scores Section */}
           <div className="grid grid-cols-2 gap-4 my-4 p-3 rounded bg-[rgba(255,255,255,0.02)] border border-[var(--color-border-light)]">
             <div className="text-center border-r border-[var(--color-border-light)]">
-              <span className="block text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] mb-1">Match Fit</span>
+              <span className="block text-[11px] md:text-xs uppercase tracking-wider text-[var(--color-text-secondary)] mb-1">Match Fit</span>
               <span className={`text-xl font-bold px-2 py-0.5 rounded border ${getScoreColor(job.fitScore)}`}>
                 {job.fitScore}%
               </span>
             </div>
             <div className="text-center">
-              <span className="block text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] mb-1">Company Trust</span>
+              <span className="block text-[11px] md:text-xs uppercase tracking-wider text-[var(--color-text-secondary)] mb-1">Company Trust</span>
               <span className={`text-xl font-bold px-2 py-0.5 rounded border ${getScoreColor(job.trustScore)}`}>
                 {job.trustScore}%
               </span>
@@ -384,10 +384,10 @@ export default function JobAgentPage() {
           <div className="space-y-2 mb-6">
             {job.matchedSkills && job.matchedSkills.length > 0 && (
               <div>
-                <span className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] block mb-1">Matched Skills</span>
+                <span className="text-[11px] md:text-xs uppercase tracking-wider text-[var(--color-text-secondary)] block mb-1">Matched Skills</span>
                 <div className="flex flex-wrap gap-1">
                   {job.matchedSkills.map((s, i) => (
-                    <span key={i} className="text-[10px] px-2 py-0.5 rounded bg-[rgba(34,197,94,0.1)] text-[var(--color-success)] border border-[rgba(34,197,94,0.2)]">
+                    <span key={i} className="text-[11px] md:text-xs px-2 py-1 rounded bg-[rgba(34,197,94,0.1)] text-[var(--color-success)] border border-[rgba(34,197,94,0.2)]">
                       {s}
                     </span>
                   ))}
@@ -396,10 +396,10 @@ export default function JobAgentPage() {
             )}
             {job.missingSkills && job.missingSkills.length > 0 && (
               <div>
-                <span className="text-[10px] uppercase tracking-wider text-[var(--color-text-secondary)] block mb-1">Missing Requirements</span>
+                <span className="text-[11px] md:text-xs uppercase tracking-wider text-[var(--color-text-secondary)] block mb-1">Missing Requirements</span>
                 <div className="flex flex-wrap gap-1">
                   {job.missingSkills.map((s, i) => (
-                    <span key={i} className="text-[10px] px-2 py-0.5 rounded bg-[rgba(239,68,68,0.1)] text-[var(--color-error)] border border-[rgba(239,68,68,0.2)]">
+                    <span key={i} className="text-[11px] md:text-xs px-2 py-1 rounded bg-[rgba(239,68,68,0.1)] text-[var(--color-error)] border border-[rgba(239,68,68,0.2)]">
                       {s}
                     </span>
                   ))}
@@ -424,9 +424,9 @@ export default function JobAgentPage() {
             </div>
             <button
               onClick={() => handleStartApplicationFlow(job)}
-              className="btn-primary py-2 px-4 text-xs font-bold bg-gradient-to-r from-[var(--color-accent-blue)] to-[var(--color-accent-purple)] text-white hover:opacity-90 flex items-center justify-center gap-1 mt-2"
+              className="btn-primary mt-2"
             >
-              Generate Pitch & Proposal Strategy ⚡
+              Generate Pitch &amp; Proposal Strategy ⚡
             </button>
           </div>
         </div>
@@ -435,7 +435,7 @@ export default function JobAgentPage() {
   };
 
   return (
-    <div className="w-full max-w-6xl mx-auto p-6 md:p-12 font-sans text-white">
+    <div className="w-full max-w-6xl mx-auto p-4 md:p-8 font-sans text-white">
 
       <main className="max-w-6xl mx-auto space-y-8 animate-fade-in">
 
@@ -468,7 +468,7 @@ export default function JobAgentPage() {
                   type="button"
                   onClick={handleSuggestQuery}
                   disabled={isSuggestingQuery}
-                  className="text-xs px-3 py-1.5 rounded bg-[rgba(147,51,234,0.15)] border border-[rgba(147,51,234,0.3)] text-[var(--color-accent-purple)] font-bold hover:bg-[rgba(147,51,234,0.25)] transition-colors"
+                  className="text-xs px-3 py-2 rounded bg-[rgba(147,51,234,0.15)] border border-[rgba(147,51,234,0.3)] text-[var(--color-accent-purple)] font-bold hover:bg-[rgba(147,51,234,0.25)] transition-colors touch-target"
                 >
                   {isSuggestingQuery ? 'AI Suggesting...' : '✨ Suggest Query via AI'}
                 </button>

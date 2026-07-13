@@ -138,7 +138,7 @@ export default function SimulatorPage() {
   if (!memory) return null;
 
   return (
-    <div className="w-full max-w-5xl mx-auto p-6 md:p-12 font-sans relative">
+    <div className="w-full max-w-5xl mx-auto p-4 md:p-8 font-sans relative">
 
       <main className="max-w-3xl mx-auto animate-fade-in space-y-8">
         <div className="glass-card p-8 border-t-4 border-t-[var(--color-accent-purple)]">

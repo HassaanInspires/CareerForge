@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
@@ -9,6 +9,16 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
   const pathname = usePathname();
   const { data: session, status } = useSession();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Lock body scroll when drawer is open
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => { document.body.style.overflow = ''; };
+  }, [mobileMenuOpen]);
 
   // Pages like login/register can have custom layout if needed, but a unified header/footer still adds high trust.
   const isAuthPage = pathname === '/login' || pathname === '/register';
@@ -29,7 +39,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
 
       {/* Header */}
       <header className="sticky top-0 z-50 backdrop-blur-md bg-[var(--color-bg-primary)]/80 border-b border-[var(--color-border-light)] transition-all">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2 relative z-10 group">
             <div className="w-8 h-8 bg-white rounded-md flex items-center justify-center transition-transform group-hover:scale-105">
               <span className="text-black font-bold font-mono text-xl">C</span>
@@ -122,27 +132,67 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
           </div>
         </header>
 
-        {/* Mobile Navigation Dropdown */}
+        {/* Mobile Navigation Drawer — Slide-in from right */}
         {mobileMenuOpen && session && (
-          <div className="md:hidden border-b border-[var(--color-border-light)] bg-[var(--color-bg-primary)]/95 backdrop-blur-md px-6 py-4 space-y-2 flex flex-col sticky top-16 left-0 right-0 z-40 shadow-2xl">
-            {navLinks.map((link) => {
-              const isActive = pathname === link.href;
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`text-sm font-medium py-2 px-3 rounded-lg transition-all ${
-                    isActive
-                      ? 'bg-[rgba(255,255,255,0.06)] text-white border-l-4 border-[var(--color-accent-blue)] pl-2 font-bold'
-                      : 'text-[var(--color-text-secondary)] hover:text-white hover:bg-[rgba(255,255,255,0.02)]'
-                  }`}
-                >
-                  {link.name}
+          <>
+            {/* Backdrop overlay */}
+            <div
+              className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
+              onClick={() => setMobileMenuOpen(false)}
+              aria-hidden="true"
+            />
+
+            {/* Drawer panel */}
+            <div className="fixed top-0 right-0 z-50 h-full w-[280px] max-w-[85vw] bg-[var(--color-bg-secondary)] border-l border-[var(--color-border-light)] shadow-2xl md:hidden flex flex-col animate-slide-in-right">
+              {/* Drawer header */}
+              <div className="flex items-center justify-between px-5 pb-4 pt-5 border-b border-[var(--color-border-light)]">
+                <Link href="/" className="flex items-center gap-2" onClick={() => setMobileMenuOpen(false)}>
+                  <div className="w-7 h-7 bg-white rounded flex items-center justify-center">
+                    <span className="text-black font-bold font-mono text-sm">C</span>
+                  </div>
+                  <span className="text-sm font-bold font-heading text-white">CareerForge</span>
                 </Link>
-              );
-            })}
-          </div>
+                <button
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--color-text-secondary)] hover:text-white hover:bg-[rgba(255,255,255,0.06)] transition-colors touch-target"
+                  aria-label="Close navigation"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Navigation links */}
+              <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+                {navLinks.map((link) => {
+                  const isActive = pathname === link.href;
+                  return (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={`flex items-center gap-3 text-sm font-medium py-3 px-4 rounded-xl transition-all touch-target ${
+                        isActive
+                          ? 'bg-[rgba(59,130,246,0.1)] text-white border-l-2 border-[var(--color-accent-blue)] font-semibold'
+                          : 'text-[var(--color-text-secondary)] hover:text-white hover:bg-[rgba(255,255,255,0.04)]'
+                      }`}
+                    >
+                      <span className="w-2 h-2 rounded-full bg-[var(--color-accent-blue)] opacity-0 transition-opacity" style={{ opacity: isActive ? 1 : 0 }} />
+                      <span>{link.name}</span>
+                    </Link>
+                  );
+                })}
+              </nav>
+
+              {/* Drawer footer */}
+              <div className="border-t border-[var(--color-border-light)] px-4 py-4 pb-safe">
+                <span className="text-xs text-[var(--color-text-disabled)] font-mono block text-center">
+                  v11.0 Enterprise Edition
+                </span>
+              </div>
+            </div>
+          </>
         )}
 
         {/* Main Content Area */}
